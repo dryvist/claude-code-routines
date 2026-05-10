@@ -122,6 +122,8 @@ claude-code-routines/
 ├── README.md
 ├── CLAUDE.md
 ├── DESIGN.md
+├── docs/
+│   └── CLOUD_ROUTINES_AUTH.md
 ├── .gitignore
 ├── .markdownlint-cli2.yaml
 ├── .readme-validator.yaml
