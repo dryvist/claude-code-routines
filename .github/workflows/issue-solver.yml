@@ -38,13 +38,16 @@ jobs:
         with:
           github_token: ${{ steps.app-token.outputs.token }}
           anthropic_api_key: ${{ secrets.OPENROUTER_API_KEY }}
-          use_commit_signing: "true"
           prompt: >-
             Read routines/issue-solver.prompt.md and follow every instruction
-            in it. You are running inside GitHub Actions; the wrapper handles
-            commit signing automatically. Do not call the GitHub Contents
-            API yourself or invoke any git write commands.
+            in it. You are running inside GitHub Actions with a
+            JacobPEvans-claude App installation token in $GH_TOKEN. All
+            target-repo file changes go through the Contents API
+            (`gh api repos/.../contents/<path> -X PUT --input -`); GitHub
+            auto-signs those commits as JacobPEvans-claude[bot]. Do not
+            attempt git push/commit/add against target repos — they would
+            land unsigned and the tool allowlist blocks them.
           claude_args: >-
-            --allowedTools "Read,Edit,Write,Glob,Grep,WebFetch,Task,Bash(gh search:*),Bash(gh issue:*),Bash(gh pr:*),Bash(gh gist:*),Bash(gh run:*),Bash(gh repo:*),Bash(gh api repos/*/git/refs:*),Bash(jq:*),Bash(date:*),Bash(grep:*)"
+            --allowedTools "Read,Edit,Write,Glob,Grep,WebFetch,Task,Bash(gh search:*),Bash(gh issue:*),Bash(gh pr:*),Bash(gh gist:*),Bash(gh run:*),Bash(gh repo view:*),Bash(gh api repos/*:*),Bash(jq:*),Bash(date:*),Bash(grep:*),Bash(base64:*)"
             --max-turns 80
             --model claude-sonnet-4-6
