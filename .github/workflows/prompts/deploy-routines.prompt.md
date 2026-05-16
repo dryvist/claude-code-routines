@@ -5,7 +5,10 @@ Instructions for Claude when invoked by `.github/workflows/deploy-routines.yml`.
 For every file matching `routines/*.prompt.md` in this checkout:
 
 1. Read the file. Parse the YAML frontmatter for `trigger_id`, `model`,
-   and `allowed_tools`.
+   and `allowed_tools`. If the frontmatter has no `trigger_id` field
+   (the prompt has been migrated to a native GitHub Actions workflow
+   and is no longer a cloud routine), print
+   `SKIP <basename> (no trigger_id — managed by GHA)` and move on.
 2. Extract the body below the closing `---` of the frontmatter — call
    it BODY.
 3. Call `RemoteTrigger` with `action: get` for the `trigger_id`. Extract
