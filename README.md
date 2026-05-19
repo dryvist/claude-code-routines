@@ -89,24 +89,33 @@ findings (e.g. internal hostnames, project codenames).
 
 ### Routine registration (cloud-hosted routines only)
 
-New routines auto-register on the next deploy run: when a
-`routines/*.prompt.md` file lands on `main` without a
-`trigger_id`, the deploy workflow calls `RemoteTrigger create`,
-captures the issued id, and back-commits it into the file's
-frontmatter via the Contents API. The single remaining
-operator step is wiring any new env vars or MCP connections in
-the shared cloud env at
-[`claude.ai/code/routines`](https://claude.ai/code/routines).
+New **cloud** routines auto-register on the next deploy run.
+A cloud routine is identified by the presence of a `cron` field
+in its YAML frontmatter; prompts without `cron` (e.g.
+`issue-solver.prompt.md`, which runs via its own GitHub Actions
+workflow) are left alone. When a cloud routine lands on `main`
+without a `trigger_id`, the deploy workflow calls
+`RemoteTrigger create`, captures the issued id, and back-commits
+it into the file's frontmatter via the Contents API.
 
-To activate a new routine:
+To activate a new cloud routine:
 
-1. Merge the new prompt file to `main`.
+1. Merge the new prompt file to `main` (it must have `cron` and
+   no `trigger_id`).
 2. Wait for the next daily deploy run, or trigger one
    immediately with `gh workflow run deploy-routines.yml --ref main`.
-3. If the routine needs new env vars or MCP connections,
+3. After the deploy succeeds, run `git pull` locally — the
+   back-commit added the new `trigger_id` to your file.
+4. If the routine needs new env vars or MCP connections,
    add them to the cloud env at `claude.ai/code/routines`
    (this part is not auto-managed because those values are
    secrets and live outside the repo).
+
+The back-commit lands directly on `main` via the Contents API.
+If `main` is protected by a ruleset that blocks direct pushes,
+`github-actions[bot]` must be on the bypass list for that
+ruleset, or the auto-create flow will fail and the routine will
+need manual registration.
 
 ### Required PAT Scopes
 

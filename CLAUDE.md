@@ -41,14 +41,19 @@ internal Routines API. The deploy prompt does a `get` before each `update`
 and skips files already in sync — so the daily run is near-zero-cost when
 nothing has changed.
 
-**New routines auto-register**: when a `routines/*.prompt.md` file lands
-on `main` without a `trigger_id`, the next deploy run calls
-`RemoteTrigger create`, captures the issued id, and back-commits it
-into the file's frontmatter via the Contents API. From the operator's
-side this is one step: merge the file, wait for the next deploy (or
-trigger it manually below), and the routine becomes live. Any new env
-vars or MCP connections still need a one-time setting in the cloud env
-at `claude.ai/code/routines`.
+**New cloud routines auto-register** (cloud routines are identified
+by the presence of a `cron` field in frontmatter; prompts without
+`cron` are left alone and continue to be GHA-managed). When a cloud
+routine lands on `main` without a `trigger_id`, the next deploy run
+calls `RemoteTrigger create`, captures the issued id, and back-commits
+it into the file's frontmatter via the Contents API. From the
+operator's side this is one step: merge the file, wait for the next
+deploy (or trigger it manually below), then `git pull` to receive the
+back-commit locally. Any new env vars or MCP connections still need a
+one-time setting in the cloud env at `claude.ai/code/routines`. If
+`main` is protected by a ruleset that blocks direct pushes,
+`github-actions[bot]` must be on the bypass list — otherwise the
+auto-create will fail and the routine will need manual registration.
 
 After merging a prompt change to `main`, trigger an immediate deploy with:
 

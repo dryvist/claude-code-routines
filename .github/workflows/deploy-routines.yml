@@ -23,12 +23,15 @@ jobs:
       - uses: actions/checkout@v6
 
       - uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ github.token }}
         with:
+          github_token: ${{ github.token }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: >-
             Read .github/workflows/prompts/deploy-routines.prompt.md and follow
             every instruction in it.
           claude_args: >-
-            --allowedTools "Read,Edit,Glob,Bash,RemoteTrigger"
+            --allowedTools "Read,Edit,Glob,RemoteTrigger,Bash(gh api repos/*:*),Bash(jq:*),Bash(base64:*)"
             --max-turns 40
             --model sonnet
