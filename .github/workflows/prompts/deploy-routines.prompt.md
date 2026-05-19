@@ -63,25 +63,35 @@ A) Fetch the canonical request shape from an existing cloud routine
    instead of guessing field names. Pick any file under `routines/`
    that **does** carry a `trigger_id`, call
    `RemoteTrigger action: get` on it, and inspect the full returned
-   object. That object is the authoritative schema (`name`,
-   `cron_expression` or `cron`, `job_config`, etc. — whatever the
-   server actually uses today).
+   object. That object is the authoritative schema.
 
-   Build the `create` body by deep-copying that schema and then
-   substituting only the per-routine fields from the new file's
-   frontmatter and body: the routine name (frontmatter `name`); the
-   schedule (frontmatter `cron`, written into whatever schedule field
-   the canonical shape uses); `session_context.allowed_tools` and
-   `session_context.model` from frontmatter; and
-   `events[0].data.message.content` set to the prompt BODY. Leave
-   every other field at its canonical-shape default. This keeps the
-   deploy prompt a single source of truth and avoids drift if
-   Anthropic adds optional fields to the API.
+   Build the `create` body by **deep-copying the entire
+   `job_config` and every top-level field** from the canonical
+   response, then substituting only these per-routine fields:
+   top-level `name` ← frontmatter `name`; top-level `cron_expression`
+   ← frontmatter `cron` (note the rename: the API field is
+   `cron_expression`, the frontmatter field is `cron`);
+   `job_config.ccr.session_context.allowed_tools` ← frontmatter
+   `allowed_tools`; `job_config.ccr.session_context.model` ←
+   frontmatter `model`; `job_config.ccr.events[0].data.message.content`
+   ← the prompt BODY.
+
+   **Preserve verbatim from the canonical response — do not drop
+   any of these:** `job_config.ccr.environment_id` (the cloud rejects
+   creates without it with HTTP 400 `ccr.environment_id required`),
+   `mcp_connections` (otherwise the new routine has no Slack
+   wiring), `persist_session`, and any other top-level field the
+   canonical shape contains that the substitution list above does
+   not override.
+
+   Treat the canonical response as the single source of truth for
+   field names and required values. The substitution list is what
+   the new routine differs in; everything else stays.
 
    Call `RemoteTrigger action: create` with the resulting body and
-   extract the new `trigger_id` from the response. If the API rejects
-   the shape, surface the full error in a `FAIL <basename>` line so
-   a human can adjust this prompt; do not retry blindly.
+   extract the new `trigger_id` from the response. If the API
+   rejects the shape, surface the full error in a `FAIL <basename>`
+   line so a human can adjust this prompt; do not retry blindly.
 
 B) Once the new `trigger_id` is in hand, write it back into the
    prompt file's YAML frontmatter via the GitHub Contents API so
