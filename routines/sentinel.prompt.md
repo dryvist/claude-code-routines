@@ -1,5 +1,6 @@
 ---
 name: The Sentinel
+trigger_id: trig_012Qm47ALSKohLHapA1pD9t1
 cron: "33 5 * * *"
 cron_human: Daily at 5:33 UTC (12:33 AM CT)
 model: claude-sonnet-4-6
