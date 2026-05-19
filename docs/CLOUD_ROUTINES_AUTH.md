@@ -1,5 +1,13 @@
 # Cloud Routines — Authentication & Identity
 
+> **Note (2026-05-19):** the GHA-based deploy described below is
+> currently disabled — see `.github/workflows/deploy-routines.yml` for
+> the diagnosis. While that's upstream-blocked, the active deploy path
+> is the project skill at
+> `.claude/skills/deploy-routine-changes/SKILL.md`. The env-var setup
+> below is still correct (the routines themselves run fine; only the
+> deploy *mechanism* changed).
+
 Operator runbook for getting a fork of this repo running against your own
 GitHub org. The routines themselves are written to be account-agnostic —
 all account-specific values come from routine env vars listed below.

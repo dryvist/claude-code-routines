@@ -26,53 +26,50 @@ The cloud routine has its own copy of each prompt. Editing a `.prompt.md`
 file does **not** change cloud behaviour on its own — the change must be
 pushed to the Anthropic Routines API.
 
-### Canonical: GitHub Action (manual or daily schedule)
+### Active path: Claude in an interactive session
 
-`.github/workflows/deploy-routines.yml` runs `anthropics/claude-code-action@v1`
-on two triggers: `workflow_dispatch` (manual) and a daily cron at 06:00 UTC
-(self-healing safety net). The action's instructions live in
-`.github/workflows/prompts/deploy-routines.prompt.md` — keeping the deploy
-prompt out of the YAML so it's diff-friendly and easy to edit.
+The Anthropic Routines API does not currently accept the OAuth tokens
+that claude.ai issues for this account — `RemoteTrigger` calls from
+`anthropics/claude-code-action@v1` return
+`Unable to resolve organization UUID`. The GHA workflow at
+`.github/workflows/deploy-routines.yml` is therefore disabled (see its
+header for full diagnosis). While the token issue is upstream-blocked,
+cloud routines are kept in sync by Claude itself during editing
+sessions:
 
-Auth is `CLAUDE_CODE_OAUTH_TOKEN` (sync'd from your secret store of
-choice into the workflow's `secrets.*`). The action gives Claude
-the built-in `RemoteTrigger` tool, which talks to Anthropic's
-internal Routines API. The deploy prompt does a `get` before each `update`
-and skips files already in sync — so the daily run is near-zero-cost when
-nothing has changed.
+1. Edit a `routines/*.prompt.md` file as usual.
+2. A repo-level hook in `.claude/settings.json` reminds Claude to
+   invoke the project skill at
+   [`.claude/skills/deploy-routine-changes/SKILL.md`](.claude/skills/deploy-routine-changes/SKILL.md).
+3. The skill walks Claude through `RemoteTrigger get` / `update` /
+   `create` calls (the interactive harness has working auth) and,
+   for new routines, opens a small follow-up PR to back-commit the
+   issued `trigger_id`.
 
-**New cloud routines auto-register** (cloud routines are identified
-by the presence of a `cron` field in frontmatter; prompts without
-`cron` are left alone and continue to be GHA-managed). When a cloud
-routine lands on `main` without a `trigger_id`, the next deploy run
-calls `RemoteTrigger create`, captures the issued id, and back-commits
-it into the file's frontmatter via the Contents API. From the
-operator's side this is one step: merge the file, wait for the next
-deploy (or trigger it manually below), then `git pull` to receive the
-back-commit locally. Any new env vars or MCP connections still need a
-one-time setting in the cloud env at `claude.ai/code/routines`. If
-`main` is protected by a ruleset that blocks direct pushes,
-`github-actions[bot]` must be on the bypass list — otherwise the
-auto-create will fail and the routine will need manual registration.
+The skill is the single source of truth for the procedure. Don't
+duplicate it here.
 
-After merging a prompt change to `main`, trigger an immediate deploy with:
+### Re-enabling the GHA workflow
 
-```bash
-gh workflow run deploy-routines.yml --ref main
-```
+When the OAuth token starts carrying the org UUID (Anthropic-side
+fix), restore the `on:` block in
+`.github/workflows/deploy-routines.yml` and remove the DEPRECATED
+banner from `.github/workflows/prompts/deploy-routines.prompt.md`.
+Update this section to point at the workflow as the primary path
+again.
 
-### Manual fallback: `/schedule update` from the CLI
+### Fallback: `/schedule update` from the CLI
 
-In any Claude Code session:
+If Claude's RemoteTrigger access ever stops working too, the
+last-resort path is the `/schedule update` CLI flow:
 
 ```text
 > /schedule list      # confirm trigger_id
 > /schedule update    # pick the routine, paste the new prompt
 ```
 
-Use this only when CI is unavailable. Do **not** paste into the web UI —
-the whole point of versioning these files is keeping cloud and repo in
-lockstep.
+Do **not** paste into the web UI — the whole point of versioning
+these files is keeping cloud and repo in lockstep.
 
 ## Hard rules for routine prompts
 
