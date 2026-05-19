@@ -1,6 +1,6 @@
 # Claude Code Routines — Operator Guide
 
-This repo is the source of truth for five cloud routines hosted on
+This repo is the source of truth for six cloud routines hosted on
 Anthropic's Claude Code platform. Files in `routines/*.prompt.md` are the
 versioned prompts; the cloud manages execution.
 
@@ -12,6 +12,7 @@ them. A new value means a new cloud routine, not an update.
 | Routine | File basename | Cron (UTC) |
 | --- | --- | --- |
 | Daily Polish | `daily-polish` | `0 4 * * *` |
+| The Sentinel | `sentinel` | `33 5 * * *` |
 | The Custodian | `custodian` | `0 7 * * *` |
 | Issue Solver | `issue-solver` | `0 0,12 * * *` |
 | Morning Briefing | `morning-briefing` | `0 10 * * *` |
