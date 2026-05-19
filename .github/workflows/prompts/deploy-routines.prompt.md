@@ -1,4 +1,18 @@
-# Deploy routines
+# Deploy routines — DEPRECATED 2026-05-19
+
+> **This prompt is not currently used.** The workflow that invokes it
+> (`.github/workflows/deploy-routines.yml`) has had its triggers
+> removed because the `CLAUDE_CODE_OAUTH_TOKEN` injected into the
+> action does not have the org binding the Anthropic Routines API
+> needs (`Unable to resolve organization UUID` on every call,
+> verified across two token rotations on 2026-05-19).
+>
+> The active deploy procedure is at
+> `.claude/skills/deploy-routine-changes/SKILL.md` — Claude runs it
+> in an interactive session in this repo, where the harness has
+> working RemoteTrigger access. This file is kept as historical
+> reference for the auto-deploy design (which would still be correct
+> if the OAuth token issue is fixed upstream).
 
 Instructions for Claude when invoked by `.github/workflows/deploy-routines.yml`.
 

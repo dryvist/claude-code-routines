@@ -37,6 +37,13 @@ jobs:
           GH_OWNER: ${{ github.repository_owner }}
         with:
           github_token: ${{ steps.app-token.outputs.token }}
+          # NOTE: this param may be vestigial. Issue Solver authenticates via
+          # the App installation token in $GH_TOKEN (see env: above); the prompt
+          # never reads $CLAUDE_CODE_OAUTH_TOKEN. The Routines-API breakage
+          # diagnosed on 2026-05-19 left this workflow unaffected because it
+          # does not call RemoteTrigger. A future session should test removing
+          # this line and re-running the workflow — if it still succeeds, drop
+          # the secret reference entirely.
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: >-
             Read routines/issue-solver.prompt.md and follow every instruction
