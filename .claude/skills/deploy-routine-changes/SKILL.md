@@ -101,6 +101,11 @@ substitute only the per-routine fields.**
    `job_config.ccr.environment_id`, `mcp_connections`,
    `persist_session`, and any other top-level fields. Dropping
    `environment_id` produces HTTP 400 `ccr.environment_id required`.
+   Also keep the existing nesting under
+   `job_config.ccr.events[0].data` — in particular `type: "user"`
+   sits *inside* `data` as a sibling of `message`, not above it.
+   If you re-shape by hand and accidentally flatten this, the API
+   will reject it.
 
 4. Call `RemoteTrigger action=create` with the resulting body.
    Extract `id` from the response — that's the new `trigger_id`.
@@ -109,11 +114,23 @@ substitute only the per-routine fields.**
    frontmatter immediately after the `name:` line. Don't reorder
    anything else.
 
-6. Commit and push the trigger_id back-commit via a normal PR
-   (worktree → branch → commit → push → `gh pr create`). Keep the
-   diff to the one frontmatter line — a small follow-up PR is the
-   right shape. Commit message:
+6. Commit and push the trigger_id back-commit via the normal
+   local git flow (worktree → branch → commit → push →
+   `gh pr create`). Keep the diff to the one frontmatter line — a
+   small follow-up PR is the right shape. Commit message:
    `chore(routines): set trigger_id for <basename>`.
+
+   *Why local git here rather than the Contents API?* The Hard
+   Rules in `CLAUDE.md` about Contents-API-only commits apply to
+   the **cloud-routine sandbox** (where there is no signing
+   identity — see `agentsmd/rules/git-signing.md`). This skill runs
+   in an **interactive Claude Code session on the user's Mac**,
+   which has GPG signing configured via nix-home. Local commits
+   from this context are signed and pass `required_signatures`
+   rulesets exactly the same way the user's own commits do. Don't
+   route this through the Contents API just because reviewers see
+   "no `git commit`" in CLAUDE.md and assume it applies
+   universally — it does not.
 
 ## Step 5 — Update if the cloud body drifted
 
@@ -134,7 +151,9 @@ substitute only the per-routine fields.**
    - `job_config.ccr.session_context.model` ← frontmatter `model`
    - top-level `cron_expression` ← frontmatter `cron`
 
-   Preserve everything else verbatim — same rule as Step 4.
+   Preserve everything else verbatim — same rule as Step 4,
+   including the `type: "user"` nested inside
+   `job_config.ccr.events[0].data` next to `message`.
 
 5. Call `RemoteTrigger action=update trigger_id=<id>` with the
    resulting body.

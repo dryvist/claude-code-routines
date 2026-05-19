@@ -2,3 +2,7 @@
 *.swp
 *.swo
 *~
+
+# Operator-specific Claude Code settings (per-machine permissions etc.).
+# Project-wide settings live in .claude/settings.json, which is committed.
+.claude/settings.local.json
