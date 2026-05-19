@@ -4,7 +4,8 @@ Version-controlled prompt files for
 [Claude Code Routines][routines] — scheduled agents
 that manage a GitHub portfolio. The routine prompts
 are owner-agnostic; the operator sets `$GH_OWNER`
-and a few related env vars (see
+(or `$GH_OWNERS` for The Sentinel) and a few related
+env vars (see
 [`docs/CLOUD_ROUTINES_AUTH.md`](docs/CLOUD_ROUTINES_AUTH.md)).
 
 See [DESIGN.md](DESIGN.md) for the origin story,
@@ -14,15 +15,17 @@ design decisions, and lessons learned.
 
 ## Routines
 
-| Routine                | Schedule           | Purpose                     |
-| ---------------------- | ------------------ | --------------------------- |
-| [Morning Briefing][mb] | Daily 5:00 AM CT   | Read-only activity summary  |
-| [The Custodian][cu]    | Daily 2:00 AM CT   | Weighted-random maintenance |
-| [Issue Solver][is]     | Daily 7am + 7pm CT | Solve one issue → draft PR  |
-| [Daily Polish][dp]     | Daily 11:00 PM CT  | Deep-clean one repo per day |
-| [Weekly Scorecard][ws] | Mondays 5:00 AM CT | Portfolio health scores     |
+| Routine                | Schedule           | Purpose                       |
+| ---------------------- | ------------------ | ----------------------------- |
+| [Morning Briefing][mb] | Daily 5:00 AM CT   | Read-only activity summary    |
+| [The Sentinel][se]     | Daily 12:33 AM CT  | Param/secret audit + 1 PR     |
+| [The Custodian][cu]    | Daily 2:00 AM CT   | Weighted-random maintenance   |
+| [Issue Solver][is]     | Daily 7am + 7pm CT | Solve one issue → draft PR    |
+| [Daily Polish][dp]     | Daily 11:00 PM CT  | Deep-clean one repo per day   |
+| [Weekly Scorecard][ws] | Mondays 5:00 AM CT | Portfolio health scores       |
 
 [mb]: routines/morning-briefing.prompt.md
+[se]: routines/sentinel.prompt.md
 [cu]: routines/custodian.prompt.md
 [is]: routines/issue-solver.prompt.md
 [dp]: routines/daily-polish.prompt.md
@@ -30,7 +33,7 @@ design decisions, and lessons learned.
 
 ## Architecture
 
-All 5 routines share a single Claude Code cloud
+All 6 routines share a single Claude Code cloud
 environment and post results to Slack via MCP.
 
 ```text
@@ -68,24 +71,47 @@ apt update && apt install -y gh
 The result is cached after the first run —
 `gh` is instantly available on subsequent sessions.
 
-### Environment Variable
+### Environment Variables
 
 ```text
 GH_TOKEN=<your GitHub PAT>
+GH_OWNER=<single owner for most routines>
+GH_OWNERS=<comma-separated list, Sentinel only>
+SENTINEL_OPERATOR_PATTERNS=<optional, comma-separated regex list>
 ```
 
-`gh` reads `GH_TOKEN` automatically.
+`gh` reads `GH_TOKEN` automatically. `GH_OWNERS` (e.g.
+`user-a,org-b`) is consumed only by The Sentinel —
+existing routines keep using the singular `GH_OWNER`.
+`SENTINEL_OPERATOR_PATTERNS` is an optional list of
+additional regexes The Sentinel flags as operator-specific
+findings (e.g. internal hostnames, project codenames).
+
+### Routine registration (cloud-hosted routines only)
+
+The deploy workflow only pushes prompts that carry a
+`trigger_id` in their YAML frontmatter. New routines
+ship without a `trigger_id`, which makes the deploy
+workflow skip them safely. To activate a new routine:
+
+1. Register it at
+   [`claude.ai/code/routines`](https://claude.ai/code/routines)
+   to obtain a `trigger_id`.
+2. Add the `trigger_id` to the prompt frontmatter and
+   set any new env vars on the cloud routine env.
+3. Merge, then deploy with
+   `gh workflow run deploy-routines.yml --ref main`.
 
 ### Required PAT Scopes
 
-| Scope         | Used By                              |
-| ------------- | ------------------------------------ |
-| `repo`        | All routines — read/write repo data  |
-| `delete_repo` | Custodian — branch deletion via API  |
-| `gist`        | Polish, Solver, Weekly Scorecard     |
-| `workflow`    | Custodian — workflow run checks      |
-| `read:org`    | All routines — org-level search      |
-| `project`     | Morning Briefing — project queries   |
+| Scope         | Used By                                |
+| ------------- | -------------------------------------- |
+| `repo`        | All routines — read/write repo data    |
+| `delete_repo` | Custodian — branch deletion via API    |
+| `gist`        | Polish, Solver, Scorecard, Sentinel    |
+| `workflow`    | Custodian — workflow run checks        |
+| `read:org`    | All routines — org-level search        |
+| `project`     | Morning Briefing — project queries     |
 
 ### MCP Connections
 
@@ -138,6 +164,7 @@ claude-code-routines/
     ├── daily-polish.prompt.md
     ├── issue-solver.prompt.md
     ├── morning-briefing.prompt.md
+    ├── sentinel.prompt.md
     └── weekly-scorecard.prompt.md
 ```
 
