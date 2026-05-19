@@ -89,18 +89,33 @@ findings (e.g. internal hostnames, project codenames).
 
 ### Routine registration (cloud-hosted routines only)
 
-The deploy workflow only pushes prompts that carry a
-`trigger_id` in their YAML frontmatter. New routines
-ship without a `trigger_id`, which makes the deploy
-workflow skip them safely. To activate a new routine:
+New **cloud** routines auto-register on the next deploy run.
+A cloud routine is identified by the presence of a `cron` field
+in its YAML frontmatter; prompts without `cron` (e.g.
+`issue-solver.prompt.md`, which runs via its own GitHub Actions
+workflow) are left alone. When a cloud routine lands on `main`
+without a `trigger_id`, the deploy workflow calls
+`RemoteTrigger create`, captures the issued id, and back-commits
+it into the file's frontmatter via the Contents API.
 
-1. Register it at
-   [`claude.ai/code/routines`](https://claude.ai/code/routines)
-   to obtain a `trigger_id`.
-2. Add the `trigger_id` to the prompt frontmatter and
-   set any new env vars on the cloud routine env.
-3. Merge, then deploy with
-   `gh workflow run deploy-routines.yml --ref main`.
+To activate a new cloud routine:
+
+1. Merge the new prompt file to `main` (it must have `cron` and
+   no `trigger_id`).
+2. Wait for the next daily deploy run, or trigger one
+   immediately with `gh workflow run deploy-routines.yml --ref main`.
+3. After the deploy succeeds, run `git pull` locally — the
+   back-commit added the new `trigger_id` to your file.
+4. If the routine needs new env vars or MCP connections,
+   add them to the cloud env at `claude.ai/code/routines`
+   (this part is not auto-managed because those values are
+   secrets and live outside the repo).
+
+The back-commit lands directly on `main` via the Contents API.
+If `main` is protected by a ruleset that blocks direct pushes,
+`github-actions[bot]` must be on the bypass list for that
+ruleset, or the auto-create flow will fail and the routine will
+need manual registration.
 
 ### Required PAT Scopes
 
