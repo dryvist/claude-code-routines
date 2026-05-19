@@ -1,0 +1,16 @@
+{
+  "$comment": "Project-level Claude Code settings for claude-code-routines. Committed (operator-specific settings live in .claude/settings.local.json, which is gitignored). The PostToolUse hook below nudges Claude to invoke the deploy-routine-changes skill whenever a routines/*.prompt.md file is touched, because the GHA deploy workflow is currently disabled (see .github/workflows/deploy-routines.yml and the skill SKILL.md for the full story).",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r 'if ((.tool_input.file_path // \"\") | test(\"routines/[^/]+\\\\.prompt\\\\.md$\")) then \"Routine file edited. The GHA deploy workflow is disabled — invoke the project skill at .claude/skills/deploy-routine-changes/SKILL.md before ending the session, so the cloud routine body stays in sync via RemoteTrigger.\" else empty end' >&2"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -89,33 +89,27 @@ findings (e.g. internal hostnames, project codenames).
 
 ### Routine registration (cloud-hosted routines only)
 
-New **cloud** routines auto-register on the next deploy run.
-A cloud routine is identified by the presence of a `cron` field
-in its YAML frontmatter; prompts without `cron` (e.g.
-`issue-solver.prompt.md`, which runs via its own GitHub Actions
-workflow) are left alone. When a cloud routine lands on `main`
-without a `trigger_id`, the deploy workflow calls
-`RemoteTrigger create`, captures the issued id, and back-commits
-it into the file's frontmatter via the Contents API.
+Cloud routines are kept in sync by Claude itself during editing
+sessions in this repo — the GHA deploy workflow is currently
+disabled (see [Deploying Changes](#deploying-changes) below).
+The procedure lives in
+[`.claude/skills/deploy-routine-changes/SKILL.md`][skill]. A
+repo-level hook in `.claude/settings.json` reminds Claude to
+invoke the skill whenever a `routines/*.prompt.md` file is
+edited. For new routines, the skill opens a small follow-up PR to
+back-commit the issued `trigger_id`.
 
-To activate a new cloud routine:
+Cloud routines vs. GHA-managed prompts are distinguished by the
+presence of a `cron` field in YAML frontmatter; prompts without
+`cron` (e.g. `issue-solver.prompt.md`) run via their own native
+workflows and are not touched by the skill.
 
-1. Merge the new prompt file to `main` (it must have `cron` and
-   no `trigger_id`).
-2. Wait for the next daily deploy run, or trigger one
-   immediately with `gh workflow run deploy-routines.yml --ref main`.
-3. After the deploy succeeds, run `git pull` locally — the
-   back-commit added the new `trigger_id` to your file.
-4. If the routine needs new env vars or MCP connections,
-   add them to the cloud env at `claude.ai/code/routines`
-   (this part is not auto-managed because those values are
-   secrets and live outside the repo).
+Env vars and MCP connections still need a one-time setting in the
+shared cloud env at
+[`claude.ai/code/routines`](https://claude.ai/code/routines) —
+those values are secrets and live outside the repo.
 
-The back-commit lands directly on `main` via the Contents API.
-If `main` is protected by a ruleset that blocks direct pushes,
-`github-actions[bot]` must be on the bypass list for that
-ruleset, or the auto-create flow will fail and the routine will
-need manual registration.
+[skill]: .claude/skills/deploy-routine-changes/SKILL.md
 
 ### Required PAT Scopes
 
@@ -137,24 +131,25 @@ Each routine connects to Slack for output:
 
 ## Deploying Changes
 
-[`.github/workflows/deploy-routines.yml`][dw]
-runs `anthropics/claude-code-action@v1` against
-Anthropic's `RemoteTrigger` API, authenticated
-with `CLAUDE_CODE_OAUTH_TOKEN`. It triggers on
-`workflow_dispatch` and daily at 06:00 UTC.
+The GHA-based deploy at [`.github/workflows/deploy-routines.yml`][dw]
+is **currently disabled**. The `CLAUDE_CODE_OAUTH_TOKEN` it injects
+into `anthropics/claude-code-action@v1` does not carry the org
+binding the Anthropic Routines API needs — every `RemoteTrigger`
+call returned `Unable to resolve organization UUID`, verified
+2026-05-19 across two consecutive token rotations. The workflow
+header has the full diagnosis and re-enablement instructions.
 
-After merging a prompt change to `main`, deploy
-immediately with `gh workflow run deploy-routines.yml --ref main`.
+While that's upstream-blocked, the active deploy path is
+[`.claude/skills/deploy-routine-changes/SKILL.md`][skill] —
+Claude invokes it during an editing session in this repo (the
+interactive harness has working RemoteTrigger access). A
+repo-level hook nudges Claude to run the skill whenever a
+`routines/*.prompt.md` file is touched.
 
-The workflow's instructions live alongside it in
-[`deploy-routines.prompt.md`][dpr].
-
-See [CLAUDE.md](CLAUDE.md) for the full operator
-guide, the manual `/schedule update` fallback, and
-the hard rules every routine prompt must follow.
+For background and the manual `/schedule update` last-resort
+fallback, see [CLAUDE.md](CLAUDE.md).
 
 [dw]: .github/workflows/deploy-routines.yml
-[dpr]: .github/workflows/prompts/deploy-routines.prompt.md
 
 ## File Structure
 

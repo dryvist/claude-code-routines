@@ -1,10 +1,43 @@
 ---
+# ──────────────────────────────────────────────────────────────────────
+# DISABLED — 2026-05-19.
+#
+# Why: The Anthropic Routines API rejects every RemoteTrigger call from
+#   this action with `Unable to resolve organization UUID`. The OAuth
+#   token issued by claude.ai for `CLAUDE_CODE_OAUTH_TOKEN` does not
+#   carry the org binding the Routines API needs, even after a fresh
+#   rotation through Doppler (`gh-workflow-tokens-prd`). Verified on
+#   2026-05-19 across two consecutive token rotations and on every
+#   routine. The same token works fine for `claude-code-action`'s
+#   own auth (issue-solver.yml runs daily) — the failure is specific
+#   to the Routines API endpoint.
+#
+# Current deploy path: cloud routines are now kept in sync by Claude
+#   running interactively in this repo. See
+#   `.claude/skills/deploy-routine-changes/SKILL.md` for the procedure
+#   and `.claude/settings.json` for the hook that reminds Claude to
+#   invoke the skill whenever a `routines/*.prompt.md` file is edited.
+#   The interactive harness has working RemoteTrigger access.
+#
+# To re-enable: once the OAuth token starts carrying the org UUID
+#   (Anthropic-side fix), restore the `on:` block below and verify
+#   with one manual `gh workflow run deploy-routines.yml --ref main`.
+#   The `show_full_output: true` setting is already on, so the agent's
+#   per-routine PASS/SKIP/FAIL lines will be visible in the run log.
+# ──────────────────────────────────────────────────────────────────────
 name: Deploy routines
 
+# Triggers intentionally removed — see disabled header above. Restore
+# this block to re-enable:
+#
+#   workflow_dispatch:
+#   schedule:
+#     - cron: '0 3 * * *'
+#
+# `workflow_call` keeps the YAML valid (`on:` cannot be empty) without
+# providing any externally-firing trigger. No caller exists.
 on:
-  workflow_dispatch:
-  schedule:
-    - cron: '0 3 * * *'
+  workflow_call:
 
 permissions:
   contents: write
