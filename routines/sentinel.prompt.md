@@ -1,6 +1,5 @@
 ---
 name: The Sentinel
-trigger_id: trig_TBD
 cron: "33 5 * * *"
 cron_human: Daily at 5:33 UTC (12:33 AM CT)
 model: claude-sonnet-4-6
@@ -83,32 +82,34 @@ If the gist fetch/parse fails (404, network, JSON error): proceed with empty `at
 CUTOFF=$(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-14d +%Y-%m-%dT%H:%M:%SZ)
 
 for OWNER in $(echo "$GH_OWNERS" | tr ',' ' '); do
-  gh repo list "$OWNER" --limit 100 \
-    --json name,pushedAt,isArchived,visibility \
+  gh repo list "$OWNER" --limit 1000 \
+    --json name,pushedAt,isArchived,visibility,defaultBranchRef \
     | jq --arg cutoff "$CUTOFF" --arg owner "$OWNER" \
-      '[.[] | select(.isArchived==false) | select(.pushedAt > $cutoff) | {owner:$owner, name, visibility, pushedAt}]'
+      '[.[] | select(.isArchived==false) | select(.pushedAt > $cutoff) | {owner:$owner, name, visibility, pushedAt, default_branch: .defaultBranchRef.name}]'
 done
 ```
 
-Merge the JSON arrays into a single repo list.
+Merge the JSON arrays into a single repo list. Use each row's `default_branch` value (NOT a hardcoded `main`) for every per-repo Contents API call below — repos may default to `master`, `develop`, `trunk`, etc.
 
 ## Phase 2 — FETCH DIFFS (deterministic shell)
 
-For each repo, list commits in the last 7 days and fetch each diff:
+For each repo, list commit SHAs in the last 7 days, then walk each commit file-by-file so filename and line number stay associated with every added line. Phase 3 needs `(filename, line_number, added_text)` tuples — never flatten patches into a single grep stream.
 
 ```bash
 SINCE=$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-7d +%Y-%m-%dT%H:%M:%SZ)
 
 gh api "repos/$OWNER/$REPO/commits?since=$SINCE" --paginate --jq '.[].sha'
-
-# Per SHA — get added lines only (drop the +++ header and -lines):
-gh api "repos/$OWNER/$REPO/commits/$SHA" \
-  --jq '.files[] | {filename, patch}' \
-  | jq -r 'select(.patch != null) | "\(.filename)\n\(.patch)"' \
-  | grep -E '^(\+[^+]|[^+\-])' || true
 ```
 
-Skip binary files (Contents API omits `patch` for them — the `select` filter above handles this).
+For each SHA, fetch its files (one API call per commit):
+
+```bash
+gh api "repos/$OWNER/$REPO/commits/$SHA" --jq '.files[] | select(.patch != null) | {filename, patch}'
+```
+
+For each `{filename, patch}` row, walk the patch hunk-by-hunk. Each hunk header `@@ -A,B +C,D @@` gives the starting `+`-side line number (`C`). Walk down the hunk body: lines starting with `+` (but not `+++`) are added lines — emit `(filename, current_line, content)` and increment the line counter. Lines starting with `-` are deletions — skip without incrementing. Context lines (no leading `+`/`-`) — skip but increment. Reset to the next hunk's `C` when a new `@@` header appears.
+
+Skip binary files (Contents API omits `patch` for them — the `select` filter above handles this). The output of Phase 2 is a stream of structured `(owner, repo, sha, filename, line, content)` tuples that Phase 3 scans.
 
 ## Phase 3 — SCAN (deterministic `grep -P`)
 
@@ -131,8 +132,8 @@ Run these pattern groups against added lines from Phase 2. Each pattern is a one
 
 **Magic-value patterns (PR-eligible — parameterize):**
 
-- `(?<![0-9])(10|172|192)\.\d+\.\d+\.\d+` — score 35 (RFC1918 IPs)
-- `https?://(?!localhost|127\.0\.0\.1|example\.com|example\.org|github\.com|githubusercontent\.com|githubapp\.com)[A-Za-z0-9.-]+\.[A-Za-z]{2,}` — score 20 (non-example URLs)
+- `(?<![0-9])(?:10\.\d+\.\d+\.\d+|172\.(?:1[6-9]|2[0-9]|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+)` — score 35 (RFC1918 IPs: precisely 10/8, 172.16/12, 192.168/16)
+- `https?://(?!(?:[a-z0-9-]+\.)*(?:localhost|example\.com|example\.org|github\.com|githubusercontent\.com|githubapp\.com)(?:[/:?#]|$))[A-Za-z0-9.-]+\.[A-Za-z]{2,}` — score 20 (non-example URLs; allowlist matches subdomains via `(?:[a-z0-9-]+\.)*` so `api.github.com` and `raw.githubusercontent.com` are excluded)
 - `localhost:\d{2,5}` — score 15
 - `(?i)account[_-]?id["'\s:=]+\d{12}` — score 40 (AWS account ID in context)
 
@@ -168,6 +169,8 @@ Tiebreaker on equal scores: prefer public-repo visibility (higher exposure), the
 
 ## Phase 5 — DRAFT THE FIX (Sonnet, ≤ 3k tokens)
 
+`$DEFAULT_BRANCH` is the per-repo `default_branch` captured in Phase 1 — substitute that repo's value (never assume `main`).
+
 Read the offending file via Contents API:
 
 ```bash
@@ -187,19 +190,19 @@ Stage the fixed content into `/tmp/scratch.after` with `Write`. Re-run the same 
 
 Slug = first 3–4 words of a short description of the fix, kebab-cased, lowercased. Date suffix = `YYYY-MM-DD`.
 
-1. Default branch SHA: `gh api repos/$OWNER/$REPO/git/ref/heads/main --jq '.object.sha'`
+1. Default branch SHA: `gh api repos/$OWNER/$REPO/git/ref/heads/$DEFAULT_BRANCH --jq '.object.sha'`
 2. Create branch: `gh api repos/$OWNER/$REPO/git/refs -X POST -f ref="refs/heads/chore/sentinel-<slug>-<date>" -f sha="<SHA>"`
 3. Existing file SHA on the new branch: `gh api repos/$OWNER/$REPO/contents/$FILE?ref=chore/sentinel-<slug>-<date> --jq '.sha'`
-4. Commit via Contents API. The committer object MUST be nested — build the payload with `jq -n` (mirror the block in `daily-polish.prompt.md` and `issue-solver.prompt.md`). Commit message:
+4. Commit via Contents API. The committer object MUST be nested — build the payload with `jq -n` (mirror the block in `daily-polish.prompt.md`'s Hard Rules section, which uses the same nested-committer shape Sentinel needs; do NOT model on `issue-solver.prompt.md`, which intentionally omits the committer field to trigger App-token auto-attribution). Commit message:
 
    ```text
    chore(<repo>): parameterize <thing> [sentinel-YYYY-MM-DD]
    ```
 
-5. Open the draft PR:
+5. Open the draft PR (`--base` is the repo's actual default branch, captured in Phase 1):
 
    ```bash
-   gh pr create --repo $OWNER/$REPO --head chore/sentinel-<slug>-<date> --base main --draft \
+   gh pr create --repo $OWNER/$REPO --head chore/sentinel-<slug>-<date> --base $DEFAULT_BRANCH --draft \
      --title "🔒 Sentinel: parameterize <thing>" \
      --body-file /tmp/pr-body.md
    ```
@@ -305,4 +308,4 @@ No PR this run.
 
 ## Commit shape (reference)
 
-Use the same `jq -n` Contents-API payload pattern documented in `routines/daily-polish.prompt.md` (Hard Rules section) and `routines/issue-solver.prompt.md` (Phase 4). For new files omit `sha`; for updates include `--arg sha "<existing-file-sha>"`. Always pipe via `--input -`; never use flat `-f committer.name=...`.
+Use the same `jq -n` Contents-API payload pattern documented in `routines/daily-polish.prompt.md` (Hard Rules section) — it shows the nested `committer` object Sentinel needs for PAT-based signing. Do NOT model on `routines/issue-solver.prompt.md`, which intentionally omits the committer field because it runs inside a GitHub Actions runner with an App installation token that auto-attributes commits. For new files omit `sha`; for updates include `--arg sha "<existing-file-sha>"`. Always pipe via `--input -`; never use flat `-f committer.name=...`.

@@ -83,8 +83,24 @@ SENTINEL_OPERATOR_PATTERNS=<optional, comma-separated regex list>
 `gh` reads `GH_TOKEN` automatically. `GH_OWNERS` (e.g.
 `user-a,org-b`) is consumed only by The Sentinel —
 existing routines keep using the singular `GH_OWNER`.
-`SENTINEL_OPERATOR_PATTERNS` is an optional denylist
-of extra regexes The Sentinel flags as operator-specific.
+`SENTINEL_OPERATOR_PATTERNS` is an optional list of
+additional regexes The Sentinel flags as operator-specific
+findings (e.g. internal hostnames, project codenames).
+
+### Routine registration (cloud-hosted routines only)
+
+The deploy workflow only pushes prompts that carry a
+`trigger_id` in their YAML frontmatter. New routines
+ship without a `trigger_id`, which makes the deploy
+workflow skip them safely. To activate a new routine:
+
+1. Register it at
+   [`claude.ai/code/routines`](https://claude.ai/code/routines)
+   to obtain a `trigger_id`.
+2. Add the `trigger_id` to the prompt frontmatter and
+   set any new env vars on the cloud routine env.
+3. Merge, then deploy with
+   `gh workflow run deploy-routines.yml --ref main`.
 
 ### Required PAT Scopes
 
