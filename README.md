@@ -89,18 +89,24 @@ findings (e.g. internal hostnames, project codenames).
 
 ### Routine registration (cloud-hosted routines only)
 
-The deploy workflow only pushes prompts that carry a
-`trigger_id` in their YAML frontmatter. New routines
-ship without a `trigger_id`, which makes the deploy
-workflow skip them safely. To activate a new routine:
+New routines auto-register on the next deploy run: when a
+`routines/*.prompt.md` file lands on `main` without a
+`trigger_id`, the deploy workflow calls `RemoteTrigger create`,
+captures the issued id, and back-commits it into the file's
+frontmatter via the Contents API. The single remaining
+operator step is wiring any new env vars or MCP connections in
+the shared cloud env at
+[`claude.ai/code/routines`](https://claude.ai/code/routines).
 
-1. Register it at
-   [`claude.ai/code/routines`](https://claude.ai/code/routines)
-   to obtain a `trigger_id`.
-2. Add the `trigger_id` to the prompt frontmatter and
-   set any new env vars on the cloud routine env.
-3. Merge, then deploy with
-   `gh workflow run deploy-routines.yml --ref main`.
+To activate a new routine:
+
+1. Merge the new prompt file to `main`.
+2. Wait for the next daily deploy run, or trigger one
+   immediately with `gh workflow run deploy-routines.yml --ref main`.
+3. If the routine needs new env vars or MCP connections,
+   add them to the cloud env at `claude.ai/code/routines`
+   (this part is not auto-managed because those values are
+   secrets and live outside the repo).
 
 ### Required PAT Scopes
 

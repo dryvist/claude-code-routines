@@ -41,6 +41,15 @@ internal Routines API. The deploy prompt does a `get` before each `update`
 and skips files already in sync — so the daily run is near-zero-cost when
 nothing has changed.
 
+**New routines auto-register**: when a `routines/*.prompt.md` file lands
+on `main` without a `trigger_id`, the next deploy run calls
+`RemoteTrigger create`, captures the issued id, and back-commits it
+into the file's frontmatter via the Contents API. From the operator's
+side this is one step: merge the file, wait for the next deploy (or
+trigger it manually below), and the routine becomes live. Any new env
+vars or MCP connections still need a one-time setting in the cloud env
+at `claude.ai/code/routines`.
+
 After merging a prompt change to `main`, trigger an immediate deploy with:
 
 ```bash

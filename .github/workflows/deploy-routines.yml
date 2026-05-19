@@ -7,7 +7,7 @@ on:
     - cron: '0 3 * * *'
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 concurrency:
@@ -29,6 +29,6 @@ jobs:
             Read .github/workflows/prompts/deploy-routines.prompt.md and follow
             every instruction in it.
           claude_args: >-
-            --allowedTools "Read,Glob,RemoteTrigger"
+            --allowedTools "Read,Edit,Glob,Bash,RemoteTrigger"
             --max-turns 40
             --model sonnet
