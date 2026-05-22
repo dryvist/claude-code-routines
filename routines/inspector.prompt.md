@@ -1,5 +1,6 @@
 ---
 name: The Inspector
+trigger_id: trig_01Kaa2rWoVFS4HN4LRR5UMWX
 cron: "0 6 * * *"
 cron_human: Daily at 6:00 UTC (1:00 AM CT)
 model: claude-sonnet-4-6

@@ -1,5 +1,6 @@
 ---
 name: The Apothecary
+trigger_id: trig_015zNd6NJRJZCd784qX5FEgm
 cron: "0 13 * * *"
 cron_human: Daily at 13:00 UTC (8:00 AM CT)
 model: claude-sonnet-4-6

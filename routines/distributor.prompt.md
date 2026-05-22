@@ -1,5 +1,6 @@
 ---
 name: The Distributor
+trigger_id: trig_01HoVTrJjo41JFEyzmY1tU5b
 cron: "0 14 * * *"
 cron_human: Daily at 14:00 UTC (9:00 AM CT)
 model: claude-sonnet-4-6
