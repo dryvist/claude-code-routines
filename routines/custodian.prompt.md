@@ -34,30 +34,18 @@ The `gh` CLI is pre-installed and authenticated via GH_TOKEN environment variabl
 
 ## Task Selection
 
-Use today's date (YYYY-MM-DD) as a seed. Convert to integer (remove dashes), mod by 100. Walk the cumulative weight table twice to select 2 tasks (re-roll on duplicate).
+Use today's date (YYYY-MM-DD) as a seed. Convert to integer (remove dashes), mod by 100. Walk the cumulative weight table once to select 1 task.
 
 | Cumulative | Task ID | Task |
 | ---------- | ------- | ---- |
-| 0-24 | pr-triage | PR Triage |
-| 25-44 | issue-triage | Issue Triage |
-| 45-59 | branch-cleanup | Stale Branch Cleanup |
-| 60-74 | aw-health | Agentic Workflow Health |
-| 75-84 | repo-audit | Repo Health Audit |
-| 85-89 | inactive-scan | Inactive Repo Scan |
-| 90-94 | dep-dashboard | Dependency Dashboard Cleanup |
-| 95-99 | stale-pr | Stale PR Cleanup |
+| 0-33 | issue-triage | Issue Triage |
+| 34-58 | branch-cleanup | Stale Branch Cleanup |
+| 59-75 | repo-audit | Repo Health Audit |
+| 76-83 | inactive-scan | Inactive Repo Scan |
+| 84-91 | dep-dashboard | Dependency Dashboard Cleanup |
+| 92-99 | stale-pr | Stale PR Cleanup |
 
 ## Task Definitions
-
-### pr-triage
-
-```bash
-gh search prs --owner "$GH_OWNER" --state open --limit 100 --json repository,number,title,author,createdAt,statusCheckRollup,mergeable,labels
-```
-
-- Auto-merge: author is renovate[bot] or dependabot[bot] AND all checks pass AND mergeable. Use: `gh pr merge --squash --repo $GH_OWNER/<repo> <number>`
-- Flag: human PRs open >48h with 0 reviews. Comment once (check for existing comment first): "This PR has been open for N days without review."
-- Max: 8 merges, 3 comments
 
 ### issue-triage
 
@@ -87,16 +75,6 @@ gh pr list --repo $GH_OWNER/<repo> --head <branch> --state closed --json number 
 Delete if merged/closed: `gh api -X DELETE repos/$GH_OWNER/<repo>/git/refs/heads/<branch>`
 
 - Max: 15 deletions. Never delete main, develop, release/* branches.
-
-### aw-health
-
-```bash
-gh search issues --owner "$GH_OWNER" --state open -- "[aw]" --json repository,number,title,createdAt --limit 50
-```
-
-- Close transient no-ops (title contains "No-Op" or "no-op")
-- For genuine failures: add label `priority:high` if not present
-- Max: 8 closures, 5 label edits
 
 ### repo-audit
 
@@ -145,13 +123,13 @@ Close bot PRs (renovate, dependabot) open >14 days with failing checks. Comment:
 
 ## Slack Output
 
-After completing both tasks, send a summary to Slack. Format:
+After completing the task, send a summary to Slack. Format:
 
 🏠 Custodian Daily Report — [date]
 
-Tasks: [task1], [task2]
+Task: [task]
 
-[For each task: 2-3 line summary of actions taken with repo#number links]
+[2-3 line summary of actions taken with repo#number links]
 
 Repos touched: [count]
 
