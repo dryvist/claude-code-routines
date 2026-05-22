@@ -38,14 +38,15 @@ Use today's date (YYYY-MM-DD) as a seed. Convert to integer (remove dashes), mod
 
 | Cumulative | Task ID | Task |
 | ---------- | ------- | ---- |
-| 0-24 | pr-triage | PR Triage |
-| 25-44 | issue-triage | Issue Triage |
-| 45-59 | branch-cleanup | Stale Branch Cleanup |
-| 60-74 | aw-health | Agentic Workflow Health |
-| 75-84 | repo-audit | Repo Health Audit |
-| 85-89 | inactive-scan | Inactive Repo Scan |
-| 90-94 | dep-dashboard | Dependency Dashboard Cleanup |
-| 95-99 | stale-pr | Stale PR Cleanup |
+| 0-21 | pr-triage | PR Triage |
+| 22-39 | issue-triage | Issue Triage |
+| 40-52 | branch-cleanup | Stale Branch Cleanup |
+| 53-65 | aw-health | Agentic Workflow Health |
+| 66-74 | repo-audit | Repo Health Audit |
+| 75-79 | inactive-scan | Inactive Repo Scan |
+| 80-84 | dep-dashboard | Dependency Dashboard Cleanup |
+| 85-89 | stale-pr | Stale PR Cleanup |
+| 90-99 | bot-thread-resolve | Bot Review Thread Auto-Resolve |
 
 ## Task Definitions
 
@@ -143,6 +144,78 @@ Close bot PRs (renovate, dependabot) open >14 days with failing checks. Comment:
 
 - Max: 5 closures
 
+### bot-thread-resolve
+
+Auto-resolves stale `COMMENTED`-review threads left by AI review bots after the PR author has clearly responded. Without this, `required_review_thread_resolution` rulesets keep PRs un-mergeable even when every concern has been addressed in a follow-up commit.
+
+**Bot whitelist** (thread-comment author logins — exact match):
+
+- `copilot-pull-request-reviewer[bot]`
+- `gemini-code-assist[bot]`
+
+Do NOT auto-resolve threads opened by humans or by any other bot. Required-reviewer feedback is the human's job.
+
+**Discovery** — list open PRs across the owner, then per PR fetch unresolved threads + the author's activity. Replace `<OWNER>`, `<REPO>`, `<PR_NUMBER>` per call:
+
+```bash
+gh search prs --owner "$GH_OWNER" --state open --limit 100 --json repository,number,author,headRefOid
+```
+
+For each PR, fetch unresolved threads (skip if author is itself a bot in the whitelist — never resolve a bot's own threads against itself):
+
+```bash
+gh api graphql --raw-field 'query=query {
+  repository(owner: "<OWNER>", name: "<REPO>") {
+    pullRequest(number: <PR_NUMBER>) {
+      reviewThreads(first: 100) {
+        nodes {
+          id isResolved isOutdated
+          comments(first: 1) {
+            nodes { author { login } createdAt }
+          }
+        }
+      }
+    }
+  }
+}'
+```
+
+Also fetch the PR author's most recent push timestamp and most recent top-level comment. The first jq pass surfaces the author login; the second filters comments by that login:
+
+```bash
+gh pr view <PR_NUMBER> --repo $GH_OWNER/<repo> --json commits,comments,author \
+  --jq '. as $pr | {
+    lastCommitAt: ($pr.commits[-1].committedDate),
+    authorLogin: $pr.author.login,
+    lastAuthorCommentAt: ([$pr.comments[]
+      | select(.author.login == $pr.author.login)
+      | .createdAt] | max // null)
+  }'
+```
+
+**Resolution criteria** — ALL must be true to auto-resolve a thread:
+
+- `isResolved == false` AND `isOutdated == false`
+- First comment author login is in the bot whitelist above
+- First comment `createdAt` is older than 24 hours
+- PR author has either pushed a commit OR posted a top-level PR comment after the thread's first comment
+- The PR is not a draft
+
+**Resolve** via the canonical GraphQL mutation. Replace `<THREAD_ID>` (`PRRT_*` node ID):
+
+```bash
+gh api graphql --raw-field 'query=mutation {
+  resolveReviewThread(input: {threadId: "<THREAD_ID>"}) {
+    thread { id isResolved }
+  }
+}'
+```
+
+- Max: 10 thread resolutions per run (across all PRs)
+- Cap PRs scanned at 50 per run (newest first)
+- Never resolve a thread whose first comment author is NOT on the whitelist, even if the bot login looks similar — string-match exactly
+- Never post a reply on resolution — the resolution itself is the signal
+
 ## Slack Output
 
 After completing both tasks, send a summary to Slack. Format:
@@ -162,3 +235,4 @@ Repos touched: [count]
 - NEVER close issues opened by `$GH_OWNER` (the owner)
 - Check for existing bot comments before posting (avoid duplicates in last 7 days)
 - All caps MUST be respected — do not exceed any max limit
+- For `bot-thread-resolve`: never resolve a thread whose first-comment author is NOT in the explicit bot whitelist (exact-string match). When in doubt, skip — false positives silence human reviewers.
