@@ -155,10 +155,10 @@ Auto-resolves stale `COMMENTED`-review threads left by AI review bots after the 
 
 Do NOT auto-resolve threads opened by humans or by any other bot. Required-reviewer feedback is the human's job.
 
-**Discovery** — list open PRs across the owner, then per PR fetch unresolved threads + the author's activity. Replace `<OWNER>`, `<REPO>`, `<PR_NUMBER>` per call:
+**Discovery** — list open PRs across the owner (newest first, capped at the same 50 enforced in the limits below), then per PR fetch unresolved threads + the author's activity. Use the `repository.nameWithOwner` returned by the search as `<REPOSITORY_NAME_WITH_OWNER>`, split it into `<OWNER>` / `<REPO>` for the GraphQL call, and substitute `<PR_NUMBER>` from `number`:
 
 ```bash
-gh search prs --owner "$GH_OWNER" --state open --limit 100 --json repository,number,author,headRefOid
+gh search prs --owner "$GH_OWNER" --state open --sort created --order desc --limit 50 --json repository,number,author,isDraft
 ```
 
 For each PR, fetch unresolved threads (skip if author is itself a bot in the whitelist — never resolve a bot's own threads against itself):
@@ -183,7 +183,7 @@ gh api graphql --raw-field 'query=query {
 Also fetch the PR author's most recent push timestamp and most recent top-level comment. The first jq pass surfaces the author login; the second filters comments by that login:
 
 ```bash
-gh pr view <PR_NUMBER> --repo $GH_OWNER/<repo> --json commits,comments,author \
+gh pr view <PR_NUMBER> --repo <REPOSITORY_NAME_WITH_OWNER> --json commits,comments,author \
   --jq '. as $pr | {
     lastCommitAt: ($pr.commits[-1].committedDate),
     authorLogin: $pr.author.login,
