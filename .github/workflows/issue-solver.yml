@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   solve:
-    name: Pick one open issue, draft a PR
+    name: Pick one open issue, open a review-ready PR
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     timeout-minutes: 30
