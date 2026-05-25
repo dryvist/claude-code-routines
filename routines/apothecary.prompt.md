@@ -85,7 +85,7 @@ gh repo list "$GH_OWNER" --limit 100 \
   | jq '[.[] | select(.isArchived==false) | .name]'
 ```
 
-Skip blacklist (mirrors, abandoned, profile/meta — same set as Distributor).
+Apply the skip-list (mirrors, abandoned, profile/meta — same set as Distributor).
 
 ## Phase 2 — Fetch open CodeQL alerts (primary)
 
@@ -156,9 +156,11 @@ Alert age > 7 days. Filters transient findings.
 
 ### Gate 4 — File-list allowlist (subset, NOT exact-set)
 
+Fetch the PR file list once (reused by Gate 5):
+
 ```bash
-FILES=$(gh api "repos/$GH_OWNER/$REPO/pulls/$PR_NUMBER/files" \
-  --jq '[.[].filename]')
+FILES_JSON=$(gh api "repos/$GH_OWNER/$REPO/pulls/$PR_NUMBER/files")
+FILES=$(echo "$FILES_JSON" | jq '[.[].filename]')
 ```
 
 Every file in `$FILES` MUST be in the dependency-manifest allowlist:
@@ -186,11 +188,10 @@ Renovate's standard flows update manifest + lockfile together (e.g. `pyproject.t
 
 ### Gate 5 — Diff-content (closes the one-byte source-edit bypass)
 
-For each changed file, fetch the patch and verify every changed hunk line is a dependency-declaration line:
+Re-use `$FILES_JSON` from Gate 4 (same payload includes the `patch` field) and verify every changed hunk line is a dependency-declaration line:
 
 ```bash
-gh api "repos/$GH_OWNER/$REPO/pulls/$PR_NUMBER/files" \
-  --jq '.[] | {filename, patch}'
+echo "$FILES_JSON" | jq '.[] | {filename, patch}'
 ```
 
 Per-file regex for declaration lines (apply to the `+` and `-` lines of the patch, excluding the `+++` / `---` headers and `@@` hunk markers):

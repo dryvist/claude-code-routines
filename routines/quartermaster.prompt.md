@@ -96,16 +96,15 @@ gh repo list "$GH_OWNER" --limit 100 \
 
 ## Phase 2 — Fetch `.pre-commit-config.yaml`
 
-For each repo:
+For each repo, fetch content and blob SHA in one call (saves ~one API request per repo per run):
 
 ```bash
-BODY=$(gh api "repos/$GH_OWNER/$REPO/contents/.pre-commit-config.yaml" \
-  --jq '.content' 2>/dev/null | base64 -d)
-SHA=$(gh api "repos/$GH_OWNER/$REPO/contents/.pre-commit-config.yaml" \
-  --jq '.sha' 2>/dev/null)
+RESP=$(gh api "repos/$GH_OWNER/$REPO/contents/.pre-commit-config.yaml" 2>/dev/null)
+BODY=$(echo "$RESP" | jq -r '.content // empty' | base64 -d)
+SHA=$(echo "$RESP" | jq -r '.sha // empty')
 ```
 
-404 → skip (no config). Empty body → skip.
+404 (empty `$RESP`) → skip (no config). Empty `$BODY` → skip.
 
 **Content-hash cache**: compute `sha256(BODY)`. If matches `content_hashes[$repo]`, skip parse (no change since last run). Otherwise update cache and continue.
 

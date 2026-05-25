@@ -197,18 +197,33 @@ gh repo list "$GH_OWNER" --limit 100 \
   | jq '[.[] | select(.isArchived==false) | .name]'
 ```
 
-Skip blacklist (mirrors, abandoned, profile/meta — same set as Distributor).
+Apply the skip-list (mirrors, abandoned, profile/meta — same set as Distributor).
 
-## Phase 2 — Fetch bot PRs
+## Phase 2 — Fetch bot PRs (one org-wide search, not per-repo)
+
+Use `gh search prs` to enumerate all open bot PRs in `$GH_OWNER` in a single call. Avoids the per-repo `gh pr list` loop (saves ~one API request per repo per run, ~100 calls/run at current estate size):
 
 ```bash
-gh pr list --repo "$GH_OWNER/$REPO" --state open --limit 50 \
-  --json number,title,author,isDraft,mergeable,mergeStateStatus,reviewDecision,labels,createdAt,headRefOid \
+gh search prs --owner "$GH_OWNER" --state open --limit 200 \
+  --json repository,number,title,author,isDraft,createdAt \
   --jq '[.[] | select(.author.login as $a |
                        ["renovate[bot]","dependabot[bot]",
                         "github-actions[bot]","jacobpevans-github-actions[bot]"]
-                       | index($a))]'
+                       | index($a))]' > /tmp/bot-prs.json
 ```
+
+Then enrich each candidate with the mergeability + CI fields via a per-PR `gh pr view` (these can't be returned from `search prs`):
+
+```bash
+jq -c '.[]' /tmp/bot-prs.json | while read -r PR; do
+  REPO=$(echo "$PR" | jq -r '.repository.nameWithOwner')
+  NUM=$(echo "$PR" | jq -r '.number')
+  gh pr view "$NUM" --repo "$REPO" \
+    --json number,mergeable,mergeStateStatus,reviewDecision,labels,headRefOid
+done
+```
+
+Skip the skip-list (mirrors, abandoned, profile/meta — same set as Distributor) when iterating.
 
 ## Phase 3 — Apply the gates in order
 
