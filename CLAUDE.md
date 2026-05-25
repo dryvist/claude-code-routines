@@ -77,6 +77,23 @@ last-resort path is the `/schedule update` CLI flow:
 Do **not** paste into the web UI — the whole point of versioning
 these files is keeping cloud and repo in lockstep.
 
+### Staggered deploy after multi-routine merges
+
+When a single PR rewrites multiple routine prompts (e.g. PR #20),
+do NOT deploy all updates in one `RemoteTrigger update` burst.
+Stage by blast radius and watch each stage for 48 hours:
+
+1. **Stage 1 (Day 0)** — read-mostly routines (Inspector, Sentinel,
+   Morning Briefing). Watch 48h.
+2. **Stage 2 (Day 2)** — label-only / config-only mutations
+   (Apothecary, Quartermaster, Daily Polish). Watch 48h.
+3. **Stage 3 (Day 4)** — high-mutation routines (Distributor,
+   Archivist, Conductor, Custodian, Issue Solver). Watch 48h.
+
+If a stage produces unexpected PRs/issues/merges, halt subsequent
+stages, set `ROUTINE_PAUSED=true` on the misbehaving routine via
+the claude.ai web UI, and fix forward.
+
 ## Hard rules for routine prompts
 
 These rules apply to every routine that mutates GitHub state. Bake them
@@ -105,6 +122,94 @@ identity/auth/signing model in one place).
    session-ID variable. References like
    `${CLAUDE_CODE_REMOTE_SESSION_ID}` render literally. If you need a
    session link, there isn't one.
+5. **Paused flag.** Every routine checks `${ROUTINE_PAUSED}` at the
+   top of its main task. If set (any non-empty value), emit a
+   single Slack message `🛑 <Routine> paused via env` and exit.
+   This is the kill switch for a misbehaving routine — setting the
+   env var on the claude.ai web UI takes effect on the next cron
+   tick without a redeploy.
+6. **Body redaction before any commit/issue/PR composition.** Every
+   string fetched from outside the routine (file bodies, PR titles,
+   issue bodies, alert names, commit messages) and destined for
+   GitHub or Slack MUST pass through the redaction regex set
+   before being written. Canonical regex set:
+
+   ```text
+   s|/Users/[^/]+/|/Users/<redacted>/|g
+   s|\$\{GIT_HOME[A-Z_]*\}|<path>|g
+   s|GH_PAT_[A-Z]+|<secret>|g
+   s|sk-ant-[A-Za-z0-9_-]+|<key>|g
+   s|gh[ps]_[A-Za-z0-9]+|<key>|g
+   s|\b\d{12}\b|<aws-account>|g
+   ```
+
+   Skip-list when scanning source files: `*.local.md`, `.envrc`,
+   `.envrc.local`, `CLAUDE.local.md`. A redacted match in a
+   Provenance "Why" line MUST describe the rule that fired, not
+   quote the offending string.
+7. **Slack output sanitization.** Slack's `<!channel>`, `<!here>`,
+   `<@USERID>`, `<#CHANNEL>`, `<URL|text>` tokens can be smuggled
+   through PR titles, issue bodies, alert names. Every Slack-emit
+   path MUST escape `<` → `‹` and `>` → `›` in any field derived
+   from repo content:
+
+   ```bash
+   safe() { jq -Rr 'gsub("<"; "‹") | gsub(">"; "›")'; }
+   echo "${untrusted_title}" | safe
+   ```
+
+8. **State gist convention.** Each routine that holds cross-run
+   memory uses one private GitHub Gist named `<routine>-state`
+   (e.g. `distributor-state`). Schema:
+
+   ```json
+   {
+     "schema_version": 2,
+     "prompt_sha256": "abc123…",
+     "run_log": [
+       {"ts":"2026-05-25T14:00:00Z","repo":"JacobPEvans/nix-darwin",
+        "action":"pr_opened","resource_id":"https://github.com/...","reason":""}
+     ],
+     "closed_pairs": {"JacobPEvans/foo": ["bar.yml"]},
+     "cooldowns": {"JacobPEvans/foo": "2026-06-01T00:00:00Z"}
+   }
+   ```
+
+   Retention is per-field, not blanket: `run_log` trimmed to 90
+   days (archive overflow to sibling gist `<routine>-state-archive`),
+   `closed_pairs` and `apothecary-codeql-ignore` retained
+   **indefinitely** (rejection memory must outlive trim windows),
+   cooldowns trim once expired. Hard cap 1 MB per gist. Never
+   write secrets, raw alert payloads, full PR diffs, or repo file
+   contents to a state gist — `run_log.reason` is bounded to 200
+   chars after redaction (rule 6).
+
+9. **Per-repo PR budget.** PR-emitting routines (Distributor,
+   Inspector, Quartermaster, Archivist Task 1) consult a shared
+   gist `routine-pr-budget` before opening a PR. Schema:
+
+   ```json
+   {
+     "2026-05-25": {"JacobPEvans/nix-darwin": 1,
+                    "JacobPEvans/ai-workflows": 2}
+   }
+   ```
+
+   Soft cap: **2 PRs per repo per UTC day across all routines**
+   (Conductor merges don't count). Read the day's counter, skip
+   the repo if at cap, otherwise increment and proceed.
+   Concurrency posture is best-effort, not exactly-once — cron
+   stagger keeps near-misses rare. If the gist is missing,
+   corrupted, or returns non-JSON: fail open (proceed with the
+   routine's own per-run cap) AND emit a Slack warning.
+
+10. **Prompt fingerprint logging.** Each run appends one
+    `prompt_sha256` entry to the state gist (overwrites the
+    previous entry — only the most-recent fingerprint is needed).
+    Sentinel cross-checks this against `sha256` of the prompt file
+    at HEAD of `main` in `JacobPEvans/claude-code-routines`; a
+    mismatch indicates the cloud deployment is stale or has been
+    mutated out-of-band.
 
 ## Attribution conventions
 
@@ -183,7 +288,7 @@ Examples: `chore/distributor/add-gh-aw-pin-refresh-2026-05-23`,
 `docs/daily-polish/int_homelab-2026-05-23`. Avoid collisions across
 runs by always including the date in the branch name.
 
-### Review-ready, not draft
+### Review-ready, not draft (with one exception)
 
 `gh pr create` calls do NOT pass `--draft`. PRs open review-ready so
 the `ai-workflows` review workflows (`claude-review`,
@@ -191,6 +296,12 @@ the `ai-workflows` review workflows (`claude-review`,
 Routines never auto-merge; merges go through the normal review flow
 or `The Conductor`'s strict bot-author allowlist (which routine bots
 are NOT a member of).
+
+**Exception** — PRs that modify `.github/workflows/*.yml` MUST pass
+`--draft`. Two routines do this: Inspector's `no-scripts` rule
+(extracts inline workflow logic into `scripts/`) and Distributor's
+caller-pin migrations. Draft forces explicit human ready-flip
+before any auto-review fires; broken YAML never lands.
 
 ## Out of scope for this repo
 
