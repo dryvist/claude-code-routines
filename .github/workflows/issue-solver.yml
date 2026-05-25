@@ -49,12 +49,14 @@ jobs:
             Read routines/issue-solver.prompt.md and follow every instruction
             in it. You are running inside GitHub Actions with a
             JacobPEvans-claude App installation token in $GH_TOKEN. All
-            target-repo file changes go through the Contents API
-            (`gh api repos/.../contents/<path> -X PUT --input -`); GitHub
-            auto-signs those commits as JacobPEvans-claude[bot]. Do not
-            attempt git push/commit/add against target repos — they would
-            land unsigned and the tool allowlist blocks them.
+            target-repo file changes go through the GraphQL
+            createCommitOnBranch mutation
+            (`gh api graphql --input -`); GitHub auto-signs and attributes
+            those commits to JacobPEvans-claude[bot]. Do not fall back to
+            the Contents API PUT, and do not attempt git push/commit/add
+            against target repos — both paths land unsigned or
+            wrong-identity commits and the tool allowlist blocks them.
           claude_args: >-
-            --allowedTools "Read,Edit,Write,Glob,Grep,WebFetch,Task,Bash(gh search:*),Bash(gh issue:*),Bash(gh pr:*),Bash(gh gist:*),Bash(gh run:*),Bash(gh repo view:*),Bash(gh api repos/*:*),Bash(jq:*),Bash(date:*),Bash(grep:*),Bash(base64:*)"
+            --allowedTools "Read,Edit,Write,Glob,Grep,WebFetch,Task,Bash(gh search:*),Bash(gh issue:*),Bash(gh pr:*),Bash(gh gist:*),Bash(gh run:*),Bash(gh repo view:*),Bash(gh api repos/*:*),Bash(gh api graphql:*),Bash(jq:*),Bash(date:*),Bash(grep:*),Bash(base64:*),Bash(tr:*)"
             --max-turns 80
             --model claude-sonnet-4-6
