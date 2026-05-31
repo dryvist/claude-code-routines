@@ -1,6 +1,6 @@
 # Claude Code Routines — Operator Guide
 
-This repo is the source of truth for six cloud routines hosted on
+This repo is the source of truth for five cloud routines hosted on
 Anthropic's Claude Code platform. Files in `routines/*.prompt.md` are the
 versioned prompts; the cloud manages execution.
 
@@ -14,11 +14,25 @@ them. A new value means a new cloud routine, not an update.
 | Daily Polish | `daily-polish` | `0 4 * * *` |
 | The Sentinel | `sentinel` | `33 5 * * *` |
 | The Custodian | `custodian` | `0 7 * * *` |
-| Issue Solver | `issue-solver` | `0 0,12 * * *` |
-| Morning Briefing | `morning-briefing` | `0 10 * * *` |
-| Weekly Scorecard | `weekly-scorecard` | `0 10 * * 1` |
+| The Observer | `observer` | `0 10 * * *` |
 
 Files live under `routines/<basename>.prompt.md`.
+
+`The Solver` (file basename `issue-solver`, cron `0 0,12 * * *`) runs as
+a GitHub Actions workflow (`.github/workflows/issue-solver.yml`), not as
+a cloud routine — no `trigger_id` in its frontmatter. It's listed here
+for completeness but is not deployed via the cloud-routine path.
+
+## Retired routines
+
+### Weekly Scorecard (retired 2026-05-30)
+
+- **trigger_id:** `trig_01TGiH3VuW5Xp7Ej9wSQFvpq`
+- **Replacement:** Merged into The Observer (Monday code path).
+- **State migration:** On The Observer's first run, the legacy
+  `weekly-scorecard-state` gist is read, scorecard data copied into the
+  new `observer-state` gist's `scorecard_history` field, then the legacy
+  gist deleted.
 
 ## Deploying a prompt change
 
