@@ -24,7 +24,7 @@ You execute inside a GitHub Actions runner via `anthropics/claude-code-action@v1
 - For target-repo writes, call `gh api graphql --input -` with a `jq`-constructed payload containing both the `query` and `variables` (see Phase 5 for the exact shape). The token in `$GH_TOKEN` is what gives bot attribution and auto-signing; you never specify committer/author — `createCommitOnBranch` does not accept those fields and signs/attributes from the calling credential alone.
 - For target-repo reads (file contents, default-branch SHA, check runs), use `gh api repos/<owner>/<repo>/contents/<path>`, `gh api repos/<owner>/<repo>/git/ref/heads/main`, and `gh api repos/<owner>/<repo>/commits/<sha>/check-runs`.
 - Branch creation: `gh api repos/<owner>/<repo>/git/refs -X POST -f ref="refs/heads/<branch>" -f sha="<base-sha>"`. `createCommitOnBranch` requires the branch to already exist; create it via the REST `git/refs` endpoint first, then point the mutation at it.
-- For Linear API access, `curl -sS` against `https://api.linear.app/graphql` with `Authorization: Bearer $LINEAR_API_KEY` and `Content-Type: application/json`. Build request bodies with `jq -n` and feed via `--data @-` from stdin.
+- For Linear API access, use the wrapper script `scripts/linear-query.sh`. It hardcodes the Linear GraphQL endpoint and the authentication header so the workflow's tool allowlist can grant Linear access without granting arbitrary HTTPS. Build the request body (`{query, variables}`) with `jq -n` and feed it to the script via stdin. The script reads `LINEAR_API_KEY` from env, posts to Linear, and prints the response on stdout. Errors and HTTP 4xx/5xx still emit the response body for parsing.
 
 ## Hard Rules (load-bearing)
 
@@ -44,7 +44,7 @@ These rules override everything else below. If any rule conflicts with a later i
 
 ## Prerequisites
 
-`gh`, `jq`, `curl`, `base64`, `tr`, `date`, `grep` are pre-installed. `gh` is authenticated via `GH_TOKEN`. Required env vars:
+`gh`, `jq`, `base64`, `tr`, `date`, `grep` are pre-installed. `gh` is authenticated via `GH_TOKEN`. The Linear API wrapper at `scripts/linear-query.sh` is the only allowed path for talking to Linear (no raw `curl` in the allowlist). Required env vars:
 
 - `GH_TOKEN` — `JacobPEvans-claude` App installation token (auto-signs commits via `createCommitOnBranch`).
 - `GH_OWNER` — repository owner for the GitHub-Issue fallback queue (e.g. `dryvist`).
@@ -90,11 +90,8 @@ Query the JAC team's Backlog + Todo issues, ordered by priority ascending (highe
 ```bash
 jq -n '{
   query: "query { issues(filter: { state: { type: { in: [\"backlog\", \"unstarted\"] } }, team: { key: { eq: \"JAC\" } } }, orderBy: priority, first: 10) { nodes { identifier title description priority url gitBranchName createdAt updatedAt state { name type } labels { nodes { name } } assignee { id } } } }"
-}' | curl -sS -X POST https://api.linear.app/graphql \
-     -H "Authorization: Bearer $LINEAR_API_KEY" \
-     -H "Content-Type: application/json" \
-     --data @- \
-| jq '.data.issues.nodes' > /tmp/linear-candidates.json
+}' | scripts/linear-query.sh \
+   | jq '.data.issues.nodes' > /tmp/linear-candidates.json
 ```
 
 If the response carries an `errors` array, abort Phase 1, emit Path F (Linear API failure) with the error message, and fall through to Phase 1b.
@@ -179,10 +176,7 @@ If zero `ai-ready`-labeled issues exist OR all fail Phase 2 → exit with Path B
 ```bash
 # Look up the "In Progress" stateId for the JAC team (cache for this run)
 IN_PROGRESS_STATE_ID=$(jq -n '{query: "query { workflowStates(filter: { team: { key: { eq: \"JAC\" } }, name: { eq: \"In Progress\" } }) { nodes { id } } }"}' \
-  | curl -sS -X POST https://api.linear.app/graphql \
-      -H "Authorization: Bearer $LINEAR_API_KEY" \
-      -H "Content-Type: application/json" \
-      --data @- \
+  | scripts/linear-query.sh \
   | jq -r '.data.workflowStates.nodes[0].id')
 
 # Save the original stateId for revert-on-abort
@@ -192,19 +186,13 @@ ORIGINAL_STATE_ID=<from candidate.state.id>
 jq -n --arg id "$TASK_ID" --arg sid "$IN_PROGRESS_STATE_ID" '{
   query: "mutation($id: String!, $sid: String!) { issueUpdate(id: $id, input: { stateId: $sid }) { success } }",
   variables: { id: $id, sid: $sid }
-}' | curl -sS -X POST https://api.linear.app/graphql \
-       -H "Authorization: Bearer $LINEAR_API_KEY" \
-       -H "Content-Type: application/json" \
-       --data @-
+}' | scripts/linear-query.sh
 
 # Post the claim comment
 jq -n --arg id "$TASK_ID" --arg body "The Solver — 2026-05-30: claimed. Workflow run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" '{
   query: "mutation($id: String!, $body: String!) { commentCreate(input: { issueId: $id, body: $body }) { success } }",
   variables: { id: $id, body: $body }
-}' | curl -sS -X POST https://api.linear.app/graphql \
-       -H "Authorization: Bearer $LINEAR_API_KEY" \
-       -H "Content-Type: application/json" \
-       --data @-
+}' | scripts/linear-query.sh
 ```
 
 Record `ORIGINAL_STATE_ID` in `/tmp/claim.json` so the abandon workflow can revert.
@@ -365,29 +353,20 @@ After PR is open and `pr_url` captured:
 ```bash
 # Look up the "In Review" stateId for the JAC team
 IN_REVIEW_STATE_ID=$(jq -n '{query: "query { workflowStates(filter: { team: { key: { eq: \"JAC\" } }, name: { eq: \"In Review\" } }) { nodes { id } } }"}' \
-  | curl -sS -X POST https://api.linear.app/graphql \
-      -H "Authorization: Bearer $LINEAR_API_KEY" \
-      -H "Content-Type: application/json" \
-      --data @- \
+  | scripts/linear-query.sh \
   | jq -r '.data.workflowStates.nodes[0].id')
 
 # Update status
 jq -n --arg id "$TASK_ID" --arg sid "$IN_REVIEW_STATE_ID" '{
   query: "mutation($id: String!, $sid: String!) { issueUpdate(id: $id, input: { stateId: $sid }) { success } }",
   variables: { id: $id, sid: $sid }
-}' | curl -sS -X POST https://api.linear.app/graphql \
-       -H "Authorization: Bearer $LINEAR_API_KEY" \
-       -H "Content-Type: application/json" \
-       --data @-
+}' | scripts/linear-query.sh
 
 # Post the PR-link comment
 jq -n --arg id "$TASK_ID" --arg body "The Solver — 2026-05-30: PR opened — $PR_URL (CI: $CI_STATUS)" '{
   query: "mutation($id: String!, $body: String!) { commentCreate(input: { issueId: $id, body: $body }) { success } }",
   variables: { id: $id, body: $body }
-}' | curl -sS -X POST https://api.linear.app/graphql \
-       -H "Authorization: Bearer $LINEAR_API_KEY" \
-       -H "Content-Type: application/json" \
-       --data @-
+}' | scripts/linear-query.sh
 ```
 
 Update the `solver-state` gist with `{"source": "linear" | "gh-issue", "task": "<id>", "date": "<today>", "outcome": "drafted_pr", "pr_url": "<url>"}`.
