@@ -14,6 +14,7 @@ them. A new value means a new cloud routine, not an update.
 | Daily Polish | `daily-polish` | `0 4 * * *` |
 | The Sentinel | `sentinel` | `33 5 * * *` |
 | The Custodian | `custodian` | `0 7 * * *` |
+| Docs Sync | `docs-sync` | `13 8 * * *` |
 | The Observer | `observer` | `0 10 * * *` |
 
 Files live under `routines/<basename>.prompt.md`.
@@ -33,6 +34,19 @@ for completeness but is not deployed via the cloud-routine path.
   `weekly-scorecard-state` gist is read, scorecard data copied into the
   new `observer-state` gist's `scorecard_history` field, then the legacy
   gist deleted.
+
+### The Distributor (retired 2026-05-30)
+
+- **trigger_id:** `trig_01HoVTrJjo41JFEyzmY1tU5b`
+- **Replacement:** `dryvist` org-level Required Workflows (configured
+  manually via org settings). Per-tier opt-out moves from
+  `skip-distributor-<tier>` topics to explicit repo-list exclusion in
+  the org Required Workflow selector.
+- **Migration runbook:** see
+  [`docs/DISTRIBUTOR_RETIREMENT.md`](docs/DISTRIBUTOR_RETIREMENT.md).
+- **Scope note:** `JacobPEvans-personal/*` repos lose tier-workflow
+  coverage. Required Workflows only apply to org-owned repos. Migrate
+  to dryvist or accept drift.
 
 ## Deploying a prompt change
 
