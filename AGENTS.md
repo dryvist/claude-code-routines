@@ -21,6 +21,21 @@ them. A new value means a new cloud routine, not an update.
 
 Files live under `routines/<basename>.prompt.md`.
 
+## Retired routines
+
+### The Distributor (retired 2026-05-30)
+
+- **trigger_id:** `trig_01HoVTrJjo41JFEyzmY1tU5b`
+- **Replacement:** `dryvist` org-level Required Workflows (configured
+  manually via org settings). Per-tier opt-out moves from
+  `skip-distributor-<tier>` topics to explicit repo-list exclusion in
+  the org Required Workflow selector.
+- **Migration runbook:** see
+  [`docs/DISTRIBUTOR_RETIREMENT.md`](docs/DISTRIBUTOR_RETIREMENT.md).
+- **Scope note:** `JacobPEvans-personal/*` repos lose tier-workflow
+  coverage. Required Workflows only apply to org-owned repos. Migrate
+  to dryvist or accept drift.
+
 ## Deploying a prompt change
 
 The cloud routine has its own copy of each prompt. Editing a `.prompt.md`
