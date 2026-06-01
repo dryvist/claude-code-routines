@@ -64,8 +64,10 @@ the rule wins.
   that is even slightly sensitive, may inform ONLY the `docs-starlight` PR —
   NEVER the public `docs` PR. When unsure whether something is safe to publish,
   treat it as sensitive and route it to `docs-starlight`.
-- **Scrub before every public write** (see Step 2 + Step 6). Nothing reaches the
-  public `docs` branch until it passes the denylist scrub.
+- **The public secret-scan gate is authoritative.** Every draft PR you open in
+  `docs` is checked by its `secret-scan.yml` gate (gitleaks + the private org
+  ruleset, an Actions secret you CANNOT read). Do not try to fetch a denylist —
+  enforce the boundary with "Privacy is absolute" above; the gate is the backstop.
 - **DRY — one home per concept.** If a concept is already documented publicly,
   the private site LINKS to `https://docs.jacobpevans.com/...` instead of
   re-documenting it. Never duplicate prose across the two sites.
@@ -84,8 +86,8 @@ the rule wins.
 - `GIT_COMMITTER_NAME` / `GIT_COMMITTER_EMAIL` — bot identity for signed commits.
 - `PROMPT_SOURCE_URL` — link to this prompt, for the PR footer.
 
-Standard tools only (`gh`, `jq`, `base64`, `date`, `grep`, `sed`). Do NOT assume
-`gitleaks` is installed — the public scrub uses `grep` against denylist regexes.
+Standard tools only (`gh`, `jq`, `base64`, `date`). The secret-scan gate runs in
+`docs` CI, not here — this routine does not run gitleaks.
 
 ## Targets
 
@@ -117,27 +119,15 @@ jq -n '{files:{"state.json":{content:"{\"documented\":[],\"last_run\":\"\"}"}},p
 If the fetch fails (404 / network / parse): set `gist_fallback=true` for Slack,
 treat `documented` as empty, and continue. Never crash.
 
-## Step 2 — Load the private denylist (sensitive-pattern scrub)
+## Step 2 — How the public/private boundary is enforced
 
-The canonical list of what must never appear in public docs lives PRIVATELY in
-`docs-starlight` at `security/gitleaks-public-docs.toml` (single-line regexes).
-Fetch it and extract the patterns into a scratch file for `grep`:
-
-```bash
-gh api repos/$DOCS_OWNER/docs-starlight/contents/security/gitleaks-public-docs.toml \
-  --jq '.content' 2>/dev/null | base64 -d > /tmp/denylist.toml
-grep -E "^[[:space:]]*regex[[:space:]]*=" /tmp/denylist.toml \
-  | sed -E "s/^[^=]*=[[:space:]]*'''(.*)'''.*/\1/" > /tmp/denylist.patterns
-```
-
-If the fetch fails (the secret-bearing repo is unreachable, or the file is
-missing): set `denylist_unavailable=true`. **Fail closed** — when the denylist is
-unavailable you MUST NOT open a public `docs` PR this run (open only the
-`docs-starlight` PR), and say so in Slack. Never publish unscrubbed.
-
-The "scrub" used throughout: a string is public-safe only if
-`printf '%s' "<text>" | grep -qiE -f /tmp/denylist.patterns` returns NON-zero
-(no match). Any match → the text is sensitive → route to `docs-starlight`.
+There is no denylist to fetch — the sensitive-value list is a GitHub Actions
+secret (`GITLEAKS_PRIVATE_CONFIG`) the sandbox cannot read. Enforce the boundary
+by JUDGMENT (the "Privacy is absolute" rule): anything from a PRIVATE repo, or
+that names a client/employer, a real internal IP / host / MAC, an AWS account id,
+or an API token / credential, goes to `docs-starlight`, never `docs`. The public
+`docs` secret-scan gate is the authoritative backstop on every draft PR you open —
+if it fails, a sensitive value slipped through; move it to `docs-starlight`.
 
 ## Step 3 — Discover the last 48h of change
 
@@ -177,7 +167,7 @@ token"). For each concept decide its single home:
 - **Public-safe but already documented** → extend the existing public page
   (don't create a parallel one); the private site, if it touches the topic, links
   to it.
-- **Sensitive, OR from a PRIVATE repo, OR fails the scrub** → `docs-starlight`
+- **Sensitive, OR from a PRIVATE repo, OR not confidently public-safe** → `docs-starlight`
   (Pass 2), linking to the public page for any shared sub-concept.
 
 Skip concepts already in the gist's `documented` list unless there is genuinely
@@ -192,9 +182,10 @@ For each public concept:
 2. Draft `.mdx` content (or edits to an existing page). Forward-looking: mark
    shipped work as done; capture high-confidence unfinished requests under a
    "Future work" / roadmap subsection.
-3. **Scrub every drafted byte** (Step 2). Any match → remove/abstract the value
-   (use the placeholder convention: `example.com`, `192.168.0.x`, `${VAR}`,
-   `<redacted>`) or move the whole concept to Pass 2.
+3. **Keep it public-safe** (Step 2 judgment). Use the placeholder convention
+   (`example.com`, `192.168.0.x`, `${VAR}`, `<redacted>`) for anything borderline;
+   move the whole concept to Pass 2 if it cannot be made safe. The `docs`
+   secret-scan gate fails the PR if a sensitive value slips through.
 4. New page → also insert a nav entry into `docs.json` at the right group.
 
 Hold the drafted files in scratch; do not PUT yet (Step 8 commits).
@@ -224,7 +215,7 @@ the intended state. Do not invent work that was not evidenced in the 48h window.
 
 Branch per repo: `docs/docs-sync/$(date -u +%F)`. If it already exists, reuse it.
 
-For each repo (skip the public one if `denylist_unavailable=true`):
+For each repo:
 
 1. Base SHA: `gh api repos/$DOCS_OWNER/<repo>/git/ref/heads/main --jq '.object.sha'`
 2. Create branch (ignore "already exists"):
@@ -267,9 +258,9 @@ Docs Sync auto-generated PR — 48h window ending YYYY-MM-DD.
 - **Label:** `cloud-routine`
 ```
 
-After the public PR exists, re-scrub the branch as self-verification:
-`gh api repos/$DOCS_OWNER/docs/contents/<path>?ref=docs/docs-sync/YYYY-MM-DD --jq '.content' | base64 -d | grep -qiE -f /tmp/denylist.patterns`
-→ a match means a sensitive value slipped through: rename the PR title to
+After the public PR exists, the `docs` `secret-scan.yml` gate runs on it (drafts
+included). Best-effort poll `gh pr checks` for ~2 min; if the gate fails, a
+sensitive value slipped through — rename the PR title to
 `docs(sync): sensitive value detected, needs human [routine:docs-sync]` and
 surface it in Slack.
 
@@ -309,16 +300,7 @@ Routed to private (sensitive/private-origin): [k] concept(s)
 Future work captured: [f] item(s)
 ```
 
-### Path B: private-only (denylist unavailable → public withheld)
-
-```text
-⚠️ Docs Sync — [date]
-Denylist unreachable → PUBLIC PR withheld (fail-closed).
-Private docs: [PR URL] — [m] page(s)
-Action: restore docs-starlight/security/gitleaks-public-docs.toml access.
-```
-
-### Path C: freshness-only (quiet window)
+### Path B: freshness-only (quiet window)
 
 ```text
 🟦 Docs Sync — [date]
@@ -326,7 +308,7 @@ No substantive changes in the last 48h.
 Opened freshness-only PRs: public [PR URL] · private [PR URL]
 ```
 
-### Path D: degraded (gist fallback or partial failure)
+### Path C: degraded (gist fallback or partial failure)
 
 ```text
 🟧 Docs Sync — [date]
