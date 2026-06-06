@@ -1,4 +1,4 @@
-name: Issue Solver
+name: The Solver
 
 on:
   workflow_dispatch:
@@ -9,12 +9,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: issue-solver
+  group: solver
   cancel-in-progress: false
 
 jobs:
   solve:
-    name: Pick one open issue, open a review-ready PR
+    name: Pick one task (Linear primary, GH-Issue fallback), open ready-for-review PR
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     timeout-minutes: 30
@@ -29,15 +29,20 @@ jobs:
           private-key: ${{ secrets.GH_APP_CLAUDE_BOT_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
 
-      - name: Run Issue Solver
+      - name: Run The Solver
         uses: anthropics/claude-code-action@v1
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           GH_OWNER: ${{ github.repository_owner }}
+          # Linear Personal API Key, scoped to JAC team only. If unset, The
+          # Solver skips its primary queue and falls through to GH-Issue
+          # label-gated fallback (Path E in the prompt). Configure via:
+          # gh secret set LINEAR_API_KEY --body "<key>" --repo <this-repo>
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
         with:
           github_token: ${{ steps.app-token.outputs.token }}
-          # NOTE: this param may be vestigial. Issue Solver authenticates via
+          # NOTE: this param may be vestigial. The Solver authenticates via
           # the App installation token in $GH_TOKEN (see env: above); the prompt
           # never reads $CLAUDE_CODE_OAUTH_TOKEN. The Routines-API breakage
           # diagnosed on 2026-05-19 left this workflow unaffected because it
@@ -48,8 +53,9 @@ jobs:
           prompt: >-
             Read routines/issue-solver.prompt.md and follow every instruction
             in it. You are running inside GitHub Actions with a
-            JacobPEvans-claude App installation token in $GH_TOKEN. All
-            target-repo file changes go through the GraphQL
+            JacobPEvans-claude App installation token in $GH_TOKEN, and a
+            Linear Personal API Key in $LINEAR_API_KEY (scoped to JAC team
+            only). All target-repo file changes go through the GraphQL
             createCommitOnBranch mutation
             (`gh api graphql --input -`); GitHub auto-signs and attributes
             those commits to JacobPEvans-claude[bot]. Do not fall back to
@@ -57,6 +63,6 @@ jobs:
             against target repos — both paths land unsigned or
             wrong-identity commits and the tool allowlist blocks them.
           claude_args: >-
-            --allowedTools "Read,Edit,Write,Glob,Grep,WebFetch,Task,Bash(gh search:*),Bash(gh issue:*),Bash(gh pr:*),Bash(gh gist:*),Bash(gh run:*),Bash(gh repo view:*),Bash(gh api repos/*:*),Bash(gh api graphql:*),Bash(jq:*),Bash(date:*),Bash(grep:*),Bash(base64:*),Bash(tr:*)"
+            --allowedTools "Read,Edit,Write,Glob,Grep,WebFetch,Task,Bash(gh search:*),Bash(gh issue:*),Bash(gh pr:*),Bash(gh gist:*),Bash(gh run:*),Bash(gh repo view:*),Bash(gh label:*),Bash(gh api repos/*:*),Bash(gh api graphql:*),Bash(curl -sS -X POST https://api.linear.app/graphql:*),Bash(jq:*),Bash(date:*),Bash(grep:*),Bash(base64:*),Bash(tr:*)"
             --max-turns 80
             --model claude-sonnet-4-6
