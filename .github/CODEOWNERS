@@ -1,0 +1,14 @@
+# CODEOWNERS — review-required paths
+#
+# Per §S4 of the routines rewrite plan: prompts are load-bearing
+# code that the cloud sandbox executes on cron. A malicious or
+# accidental edit to any of these files can mass-mutate the
+# JacobPEvans estate via the `JacobPEvans-claude` GitHub App
+# (contents:write across the owner).
+#
+# Pair with branch protection requiring CODEOWNERS review.
+
+/routines/                              @JacobPEvans
+/.claude/skills/deploy-routine-changes/ @JacobPEvans
+/CLAUDE.md                              @JacobPEvans
+/.github/CODEOWNERS                     @JacobPEvans
