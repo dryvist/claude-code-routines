@@ -4,7 +4,7 @@ Version-controlled prompt files for
 [Claude Code Routines][routines] — scheduled agents
 that manage a GitHub portfolio. The routine prompts
 are owner-agnostic; the operator sets `$GH_OWNER`
-(or `$GH_OWNERS` for The Sentinel) and a few related
+and a few related
 env vars (see
 [`docs/CLOUD_ROUTINES_AUTH.md`](docs/CLOUD_ROUTINES_AUTH.md)).
 
@@ -75,14 +75,13 @@ The result is cached after the first run —
 
 ```text
 GH_TOKEN=<your GitHub PAT>
-GH_OWNER=<single owner for most routines>
-GH_OWNERS=<comma-separated list, Sentinel only>
+GH_OWNER=<single owner/org for all routines>
 SENTINEL_OPERATOR_PATTERNS=<optional, comma-separated regex list>
 ```
 
-`gh` reads `GH_TOKEN` automatically. `GH_OWNERS` (e.g.
-`user-a,org-b`) is consumed only by The Sentinel —
-existing routines keep using the singular `GH_OWNER`.
+`gh` reads `GH_TOKEN` automatically. Every routine scopes
+its work to the singular `GH_OWNER` (one org/user) — no
+routine enumerates a multi-owner list.
 `SENTINEL_OPERATOR_PATTERNS` is an optional list of
 additional regexes The Sentinel flags as operator-specific
 findings (e.g. internal hostnames, project codenames).

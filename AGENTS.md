@@ -233,6 +233,14 @@ identity/auth/signing model in one place).
     mismatch indicates the cloud deployment is stale or has been
     mutated out-of-band.
 
+11. **Single-owner scope.** Every routine operates on exactly one
+    configured owner (`$GH_OWNER`, default `dryvist`). No routine
+    enumerates a multi-owner list — do not reintroduce a `$GH_OWNERS`
+    variable or a comma-split owner loop. The runtime `GH_TOKEN` PAT
+    MUST be scoped to that owner's repos only; that token scope is the
+    authoritative backstop, so a prompt slip or a misconfigured env var
+    can never reach a repo outside the configured owner.
+
 ## Attribution conventions
 
 Every PR or issue created by a cloud routine MUST be self-identifying.
