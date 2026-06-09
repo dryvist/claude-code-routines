@@ -1,5 +1,6 @@
 ---
 name: Docs Sync
+trigger_id: trig_01J9F82aQp1NX5W8PcvSXyh6
 cron: "13 8 * * *"
 cron_human: Daily at 08:13 UTC (≈3:13 AM CT / 4:13 AM ET)
 model: claude-sonnet-4-6
