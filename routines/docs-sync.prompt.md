@@ -80,8 +80,7 @@ the rule wins.
 
 `gh` is pre-installed and authenticated via `GH_TOKEN`. Expected env:
 
-- `GH_OWNERS` — comma-separated owners to scan for changes (e.g.
-  `dryvist,JacobPEvans-personal`). Falls back to `GH_OWNER` if set, else `dryvist`.
+- `GH_OWNER` — single owner/org to scan for changes (default `dryvist`).
 - `DOCS_OWNER` — owner of the two doc repos (default `dryvist`).
 - `GIT_COMMITTER_NAME` / `GIT_COMMITTER_EMAIL` — bot identity for signed commits.
 - `PROMPT_SOURCE_URL` — link to this prompt, for the PR footer.
@@ -133,21 +132,19 @@ if it fails, a sensitive value slipped through; move it to `docs-starlight`.
 
 ```bash
 CUTOFF=$(date -u -d '48 hours ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-48H +%Y-%m-%dT%H:%M:%SZ)
-for OWNER in ${GH_OWNERS//,/ }; do
-  gh repo list "$OWNER" --limit 100 --json name,pushedAt,isArchived,visibility \
-    | jq --arg c "$CUTOFF" --arg o "$OWNER" \
-      '[.[] | select(.isArchived==false) | select(.pushedAt > $c)
-        | {owner:$o, name, visibility}]'
-done
+gh repo list "$GH_OWNER" --limit 100 --json name,pushedAt,isArchived,visibility \
+  | jq --arg c "$CUTOFF" --arg o "$GH_OWNER" \
+    '[.[] | select(.isArchived==false) | select(.pushedAt > $c)
+      | {owner:$o, name, visibility}]'
 ```
 
 For each changed repo, pull the window's commits + changed files:
 
 ```bash
-gh api "repos/$OWNER/$REPO/commits?since=$CUTOFF" \
+gh api "repos/$GH_OWNER/$REPO/commits?since=$CUTOFF" \
   --jq '.[] | {sha:.sha[0:7], msg:(.commit.message|split("\n")[0]), login:.author.login}'
 # Per interesting commit, the changed files:
-gh api "repos/$OWNER/$REPO/commits/<sha>" --jq '.files[] | {f:.filename, status:.status}'
+gh api "repos/$GH_OWNER/$REPO/commits/<sha>" --jq '.files[] | {f:.filename, status:.status}'
 ```
 
 Read key changed files via `gh api repos/.../contents/<path>?ref=<sha> --jq '.content' | base64 -d`

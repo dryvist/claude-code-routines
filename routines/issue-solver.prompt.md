@@ -107,7 +107,7 @@ If zero candidates remain after filtering → fall through to Phase 1b.
 
 For each of the top 5 Linear candidates (or top 5 GH-Issue candidates if entering this phase from Phase 1b), classify on these axes:
 
-1. **Repo identifiability** — Does the description name a specific GitHub repo? Scan for `\b(dryvist|JacobPEvans|JacobPEvans-personal)/[\w.-]+\b`. If exactly one repo is named with clear context → YES. If zero or ambiguously multiple → NO.
+1. **Repo identifiability** — Does the description name a specific GitHub repo? Scan for `\b(dryvist|JacobPEvans)/[\w.-]+\b` (the bare `JacobPEvans` login redirects to the `dryvist` org). The Solver operates only within `$GH_OWNER` — treat any repo whose owner resolves outside `$GH_OWNER`/`dryvist` (e.g. a personal-account repo) as repo_identifiable = NO. If exactly one in-scope repo is named with clear context → YES. If zero or ambiguously multiple → NO.
 
 2. **Sandbox-feasibility** — Does the task require ONLY repo edits + `gh` API + Linear API? NO if the description mentions: hardware (BIOS, PXE, firmware, drives), physical access (rack, plug, console), SSH to a host, `terragrunt apply`, `terraform apply`, `ansible-playbook`, AWS credentials, DNS records, certificate issuance, Proxmox/PVE/iDRAC operations, network device config (UniFi, switch), live infra apply.
 
