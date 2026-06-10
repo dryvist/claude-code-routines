@@ -31,18 +31,17 @@ This rewrite separates the concerns: README quality is its own goal (driven by c
 
 ## Hard Rules (load-bearing)
 
-These rules override everything else below. If any rule conflicts with a later instruction, the rule wins.
+<!-- include: _common/hard-rules.md -->
 
-- NEVER use `git commit`, `git add`, `git push`, `git checkout -b`, or any local git write operation. All file changes go through the GitHub Contents API with a **nested** `committer` object built by `jq` and piped via `--input -`. See "Commit shape" below.
-- PRs open review-ready so the `ai-workflows` review workflows pick them up. Never auto-merge from this routine.
-- Every PR/issue you open MUST follow the attribution conventions in [`CLAUDE.md`](../CLAUDE.md#attribution-conventions): title suffix `[routine:archivist]`, no emoji, Provenance block, `cloud-routine` label.
-- Max 1 PR OR 1 issue per run. Not both.
-- Per-repo PR budget (`CLAUDE.md` rule 9): consult `routine-pr-budget` gist before opening; skip if repo at cap.
-- `readme-quality` opens PRs against the affected consumer repo. `mintlify-coverage` files issues against `JacobPEvans/docs` ONLY — never opens PRs (Mintlify content is editorial).
-- Body content passes through the redaction filter (`CLAUDE.md` rule 6).
-- Slack output passes through the sanitization function (`CLAUDE.md` rule 7).
-- Check `${ROUTINE_PAUSED}` at start; if set, emit Slack `🛑 Archivist paused via env` and exit.
-- Always emit at least one Slack message per run, even on a no-op.
+Routine-specific rules:
+
+- Max 1 PR OR 1 issue per run (suffix `[routine:archivist]`). Not both.
+- Per-repo PR budget applies: consult `routine-pr-budget` gist before opening; skip if repo at cap.
+- `readme-quality` opens PRs against the affected consumer repo. `mintlify-coverage` files issues against `JacobPEvans/docs` ONLY — never opens PRs (Mintlify content is editorial). The docs-site target repo is the one intentional fixed-repo exception to the `$GH_OWNER`-only rule.
+
+## Attribution
+
+<!-- include: _common/attribution.md -->
 
 ## Prerequisites
 
@@ -56,7 +55,9 @@ These rules override everything else below. If any rule conflicts with a later i
 
 ## State gist — `archivist-state`
 
-Per `CLAUDE.md` rule 8. Schema (v2):
+<!-- include: _common/state-gist.md -->
+
+Routine-specific fields (v2):
 
 ```json
 {
@@ -75,18 +76,18 @@ Per `CLAUDE.md` rule 8. Schema (v2):
 }
 ```
 
-`run_log` 90 days, `cooldowns` 14 days per `(repo, task)`, `readme_scores` rewritten each run, `prompt_sha256` overwritten.
+`cooldowns` 14 days per `(repo, task)`; `readme_scores` rewritten each run.
 
 ## Skip-list (skip both tasks)
 
-Same as Distributor's hard-exclude repo list:
+Same as Distributor's hard-exclude repo list (bare names — enumeration is already scoped to `$GH_OWNER`):
 
 - Archived repos.
-- `JacobPEvans/agentics`, `JacobPEvans/agent-os` (upstream mirrors).
-- `JacobPEvans/tf-static-website` (abandoned).
-- `JacobPEvans/JacobPEvans`, `JacobPEvans/JacobPEvans.github.io`, `JacobPEvans/.github` (profile/meta).
+- `agentics`, `agent-os` (upstream mirrors).
+- `tf-static-website` (abandoned).
+- `JacobPEvans`, `JacobPEvans.github.io`, `.github` (profile/meta).
 - Splunk-app legacy repos.
-- `JacobPEvans/docs` itself (the docs site is a target, not a subject).
+- `docs` itself (the docs site is a target, not a subject).
 
 ## Task rotation
 
@@ -241,7 +242,7 @@ If `uncovered` is empty: Slack Path B, exit.
 
 Pick the most-recently-pushed uncovered repo (signals "actively used, needs site presence").
 
-Apply 14-day cooldown via `cooldowns["JacobPEvans/<repo>:mintlify-coverage"]`.
+Apply 14-day cooldown via `cooldowns["$GH_OWNER/<repo>:mintlify-coverage"]`.
 
 ```bash
 gh issue create --repo JacobPEvans/docs \
@@ -257,7 +258,7 @@ The Archivist found a docs coverage gap.
 
 ## Uncovered repo
 
-[`<repo>`](https://github.com/JacobPEvans/<repo>) — actively pushed but not referenced anywhere in `docs.json` navigation or as an `.mdx` file in this site.
+[`<repo>`](https://github.com/$GH_OWNER/<repo>) — actively pushed but not referenced anywhere in `docs.json` navigation or as an `.mdx` file in this site.
 
 ## Suggested topic
 
@@ -292,22 +293,11 @@ Append to `run_log`. NOTE: per-repo budget (C1) does not apply here because the 
 
 ## Commit shape (Task 1 only)
 
-```bash
-jq -n \
-  --arg msg "docs($REPO): improve README $GAP_DESC [routine:archivist]" \
-  --arg content "$(base64 -w0 < /tmp/archivist-new-readme.md)" \
-  --arg branch "$BRANCH" \
-  --arg sha "$EXISTING_SHA" \
-  --arg cname "$GIT_COMMITTER_NAME" \
-  --arg cemail "$GIT_COMMITTER_EMAIL" \
-  '{message:$msg, content:$content, branch:$branch, sha:$sha,
-    committer:{name:$cname, email:$cemail}}' \
-  | gh api "repos/$GH_OWNER/$REPO/contents/README.md" -X PUT --input -
-```
+Use the nested-committer `jq` recipe from the Hard Rules against `repos/$GH_OWNER/$REPO/contents/README.md` (include `sha:$sha` — README updates always replace an existing file). Commit message: `docs($REPO): improve README $GAP_DESC [routine:archivist]`.
 
-Never use `gh api -f committer.name=...` — always `jq -n` + `--input -`.
+## Slack output
 
-## Slack output (sanitize per CLAUDE.md rule 7)
+<!-- include: _common/slack-output.md -->
 
 ### Path A — Task 1 PR opened
 

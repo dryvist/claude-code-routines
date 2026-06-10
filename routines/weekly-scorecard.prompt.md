@@ -46,8 +46,8 @@ instruction, the rule wins.
   body (`{query, variables}`) with `jq -n` and feed it via stdin — never
   inline the key into a URL or log it.
 - Every Slack field derived from Linear content (issue titles, project names)
-  passes through the sanitization function (`CLAUDE.md` rule 7) and the
-  redaction filter (`CLAUDE.md` rule 6) before emit.
+  passes through the sanitization function and redaction set in the Slack
+  output section before emit.
 - Check `${ROUTINE_PAUSED}` at start; if set, emit Slack
   `🛑 Weekly Scorecard paused via env` and exit.
 - Always emit exactly one Slack message per run, even on failure (Path B).
@@ -109,6 +109,11 @@ Derive three datasets (terminal = `state.type` of `completed` or `canceled`):
    results, say so in the message rather than substituting another query.
 
 ## Step 3 — Slack output
+
+<!-- include: _common/slack-output.md -->
+
+This routine has no Hard Rules redaction section — apply the escaping above
+to every Linear-derived field (issue titles, project names).
 
 Compute `DAYS_LEFT` = days from today to 2026-07-12. Post ONE message:
 

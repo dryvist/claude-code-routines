@@ -1,0 +1,45 @@
+---
+# Render check — routines/*.prompt.md are the DRY source form with
+# `<!-- include: _common/<name>.md -->` markers. This workflow proves every
+# prompt renders cleanly (no unresolvable or nested includes) and uploads
+# the rendered blobs as an artifact so reviewers can inspect exactly what
+# the deploy-routine-changes skill would send to RemoteTrigger.
+name: Render routines
+
+# Trigger note: pull_request is listed for completeness, but PR-event
+# check suites do not currently fire in this repo (app suites sit queued
+# too — pre-existing). The unfiltered push trigger is what reliably runs
+# the check on PR branches; the render is ~5s, so the cost is negligible.
+on:
+  pull_request:
+  push:
+
+permissions: {}
+
+concurrency:
+  group: render-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  render:
+    name: Render every routine prompt
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Shellcheck the renderer
+        run: shellcheck scripts/render-routine.sh scripts/render-all-routines.sh
+
+      - name: Render all routine prompts
+        run: scripts/render-all-routines.sh /tmp/rendered
+
+      - name: Upload rendered prompts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: rendered-routines
+          path: /tmp/rendered/
+          if-no-files-found: error

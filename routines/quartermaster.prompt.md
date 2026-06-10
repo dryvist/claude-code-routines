@@ -26,19 +26,18 @@ Renovate's own `pre-commit` manager covers some repos that opt in via the centra
 
 ## Hard Rules (load-bearing)
 
-These rules override everything else below. If any rule conflicts with a later instruction, the rule wins.
+<!-- include: _common/hard-rules.md -->
 
-- NEVER use `git commit`, `git add`, `git push`, `git checkout -b`, or any local git write operation. All file changes go through the GitHub Contents API with a **nested** `committer` object built by `jq` and piped via `--input -`. See "Commit shape" below.
-- PRs open review-ready so the `ai-workflows` review workflows pick them up. Never auto-merge from this routine.
-- Every PR you open MUST follow the attribution conventions in [`CLAUDE.md`](../CLAUDE.md#attribution-conventions): title suffix `[routine:quartermaster]`, no emoji, Provenance block, `cloud-routine` label.
-- Max 3 PRs per run.
-- Per-repo PR budget (`CLAUDE.md` rule 9): consult `routine-pr-budget` gist before opening; skip if repo at cap.
+Routine-specific rules:
+
+- Max 3 PRs per run (title suffix `[routine:quartermaster]`).
+- Per-repo PR budget applies: consult `routine-pr-budget` gist before opening; skip if repo at cap.
 - Never modify any other file. ONLY `.pre-commit-config.yaml` `rev:` lines are touched.
 - Renovate-overlap guard: if an open Renovate PR targets `.pre-commit-config.yaml` in the same repo, SKIP that repo this run.
-- Body content passes through the redaction filter (`CLAUDE.md` rule 6).
-- Slack output passes through the sanitization function (`CLAUDE.md` rule 7).
-- Check `${ROUTINE_PAUSED}` at start; if set, emit Slack `🛑 Quartermaster paused via env` and exit.
-- Always emit at least one Slack message per run, even on a no-op.
+
+## Attribution
+
+<!-- include: _common/attribution.md -->
 
 ## Prerequisites
 
@@ -52,7 +51,9 @@ These rules override everything else below. If any rule conflicts with a later i
 
 ## State gist — `quartermaster-state`
 
-Per `CLAUDE.md` rule 8. Schema (v2):
+<!-- include: _common/state-gist.md -->
+
+Routine-specific fields (v2):
 
 ```json
 {
@@ -73,9 +74,7 @@ Per `CLAUDE.md` rule 8. Schema (v2):
 }
 ```
 
-`run_log` trim 90 days. `cooldowns` 14-day per-(repo, hook) pair. `content_hashes` rewritten each run. `latest_tag_cache` rewritten each run.
-
-If gist fetch fails: proceed with empty state, `gist_fallback=true` for Slack, do not crash.
+`cooldowns` 14-day per-(repo, hook) pair. `content_hashes` and `latest_tag_cache` rewritten each run.
 
 ## Phase 0 — Paused, fingerprint, budget
 
@@ -191,22 +190,11 @@ Untouched. Only the drifted `rev:` line was modified.
 
 ## Commit shape
 
-```bash
-jq -n \
-  --arg msg "chore(deps): bump pre-commit $HOOK to $NEW_REV [routine:quartermaster]" \
-  --arg content "$(base64 -w0 < /tmp/precommit-corrected.yaml)" \
-  --arg branch "$BRANCH" \
-  --arg sha "$EXISTING_SHA" \
-  --arg cname "$GIT_COMMITTER_NAME" \
-  --arg cemail "$GIT_COMMITTER_EMAIL" \
-  '{message:$msg, content:$content, branch:$branch, sha:$sha,
-    committer:{name:$cname, email:$cemail}}' \
-  | gh api "repos/$GH_OWNER/$REPO/contents/.pre-commit-config.yaml" -X PUT --input -
-```
+Use the nested-committer `jq` recipe from the Hard Rules against `repos/$GH_OWNER/$REPO/contents/.pre-commit-config.yaml` (always include `sha:$sha` — the config file already exists). Commit message: `chore(deps): bump pre-commit $HOOK to $NEW_REV [routine:quartermaster]`.
 
-Never use `gh api -f committer.name=...` — always `jq -n` + `--input -`.
+## Slack output
 
-## Slack output (sanitize per CLAUDE.md rule 7)
+<!-- include: _common/slack-output.md -->
 
 ### Path A — PRs opened
 
