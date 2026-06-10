@@ -26,9 +26,11 @@ This routine merges what used to be Morning Briefing (daily) and Weekly Scorecar
 - `GH_TOKEN` — PAT with `repo` + `read:org` scopes.
 - `GH_OWNER` — single owner/org to observe.
 
-## State Gist
+## State Gist — `observer-state`
 
-The Observer maintains a single `observer-state` gist for run history and scorecard deltas:
+<!-- include: _common/state-gist.md -->
+
+The Observer keeps run history and scorecard deltas:
 
 ```bash
 gh gist list --limit 50 | grep 'observer-state'
@@ -58,9 +60,7 @@ Schema:
 }
 ```
 
-Trim `run_log` to last 90 days each run. Keep `scorecard_history` indefinitely (it is the delta-comparison input for the Monday scorecard).
-
-If gist fetch fails (404, network, parse error): proceed with empty state and set `gist_fallback=true` in the Slack output. Do not crash.
+Legacy pre-v2 schema — the fields above are authoritative for this routine. Trim `run_log` to last 90 days each run. Keep `scorecard_history` indefinitely (it is the delta-comparison input for the Monday scorecard).
 
 ## Phase 0 — Day-of-week probe
 
@@ -174,7 +174,9 @@ Trim `run_log` to last 90 days.
 
 ## Slack output
 
-Post one Slack message daily with the briefing. On Mondays, post the scorecard as a follow-up message in the same thread (separate message — combined payload risks Slack's 4000-char limit).
+<!-- include: _common/slack-output.md -->
+
+Post one Slack message daily with the briefing. On Mondays, post the scorecard as a follow-up message in the same thread (separate message — combined payload risks Slack's 4000-char limit). The Observer has no Hard Rules redaction section — apply the escaping above to every repo-derived field (PR/issue titles, repo names).
 
 ### Daily briefing (always)
 
@@ -234,4 +236,3 @@ Keep under 3000 characters.
 - Read-only API calls only. `observer-state` gist mutations are the sole exception.
 - If rate-limited, report partial data rather than failing.
 - Briefing always emits; scorecard only emits on Mondays (`$DOW == 1`).
-- If `gist_fallback=true`, still post the briefing/scorecard but include a one-line warning at the top.

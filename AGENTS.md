@@ -46,11 +46,53 @@ registry for completeness but is not deployed via the cloud-routine path.
   coverage. Required Workflows only apply to org-owned repos. Migrate
   to dryvist or accept drift.
 
+## DRY partials and deploy-time assembly
+
+Repo prompt files are the DRY source form. Boilerplate shared across
+routines lives in `routines/_common/` as self-contained markdown
+partials:
+
+| Partial | Carries |
+| --- | --- |
+| `hard-rules.md` | Pause check, no-local-git, committer recipe, redaction |
+| `state-gist.md` | Schema-v2 skeleton, fail-open, retention, fingerprint |
+| `attribution.md` | Title suffix, no-emoji, Provenance block, label |
+| `slack-output.md` | Mandatory message, `<`/`>` sanitization function |
+
+A routine pulls a partial in with a marker line containing exactly:
+
+```text
+<!-- include: _common/<name>.md -->
+```
+
+Routine-specific values (PR caps, gist names, schedules, divergences)
+stay in the routine file near the marker. Partials must not contain
+nested include markers.
+
+`scripts/render-routine.sh <routine-path>` expands the markers and
+prints the full prompt; it exits nonzero on an unresolvable include or
+a nested include. **The deployed blob is always the rendered output,
+never the raw file** — the deploy skill renders before every
+RemoteTrigger call, and CI (`.github/workflows/render-check.yml`)
+renders every prompt on each PR and uploads the rendered blobs as an
+artifact. Editing a partial changes the rendered body of every routine
+that includes it — redeploy all affected routines.
+
+`issue-solver.prompt.md` includes no partials: it runs in GitHub
+Actions with App-token commit attribution and intentionally diverges
+on committer, attribution, and output conventions.
+
+The "Hard rules" and "Attribution conventions" sections below remain
+the operator-facing description; the prompt-body encoding of those
+rules lives in the `routines/_common/` partials. Keep the two in sync
+when a rule changes.
+
 ## Deploying a prompt change
 
 The cloud routine has its own copy of each prompt. Editing a `.prompt.md`
 file does **not** change cloud behaviour on its own — the change must be
-pushed to the Anthropic Routines API.
+rendered (`scripts/render-routine.sh`) and pushed to the Anthropic
+Routines API.
 
 ### Active path: Claude in an interactive session
 

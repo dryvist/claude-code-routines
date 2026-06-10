@@ -174,6 +174,22 @@ fallback, see [CLAUDE.md](CLAUDE.md).
 
 [dw]: .github/workflows/deploy-routines.yml
 
+### Prompt assembly (DRY partials)
+
+Routine files in `routines/` are the DRY source form. Shared
+boilerplate (hard rules, state-gist convention, attribution,
+Slack sanitization) lives in `routines/_common/` partials, pulled
+in by marker lines of the form
+`<!-- include: _common/<name>.md -->`.
+
+The deployed prompt is always the **rendered** output of
+`scripts/render-routine.sh <routine-path>`, which expands every
+marker (and fails on unresolvable or nested includes). The
+deploy skill renders before each RemoteTrigger call, and the
+[render-check workflow](.github/workflows/render-check.yml)
+renders every prompt in CI, uploading the blobs as an artifact.
+See [AGENTS.md](AGENTS.md) for the full mechanism.
+
 ## File Structure
 
 ```text

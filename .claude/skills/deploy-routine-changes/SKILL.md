@@ -30,11 +30,14 @@ disabled; do not try to trigger it.
 ## Step 1 — Identify routines to sync
 
 ```bash
-git diff --name-only origin/main...HEAD -- 'routines/*.prompt.md' 2>/dev/null
-git diff --name-only HEAD -- 'routines/*.prompt.md'
+git diff --name-only origin/main...HEAD -- 'routines/' 2>/dev/null
+git diff --name-only HEAD -- 'routines/'
 ```
 
-Union the two lists. If empty and no drift is suspected, stop here.
+Union the two lists. If a `routines/_common/*.md` partial appears,
+expand it to every `routines/*.prompt.md` file containing an include
+marker for it (`grep -l 'include: _common/<name>.md' routines/*.prompt.md`).
+If the union is empty and no drift is suspected, stop here.
 
 If working from a post-merge session (no diff against `origin/main`),
 fall back to syncing every cloud routine in the repo:
@@ -43,10 +46,25 @@ fall back to syncing every cloud routine in the repo:
 ls routines/*.prompt.md
 ```
 
-## Step 2 — Per file: parse the frontmatter
+## Step 2 — Per file: render, then parse the frontmatter
 
-Read the file. The YAML frontmatter is everything between the first
-two `---` lines. Extract:
+Routine files are the DRY source form: they contain
+`<!-- include: _common/<name>.md -->` markers that reference shared
+partials in `routines/_common/`. The cloud routine must receive the
+RENDERED prompt — never the raw file with markers in it.
+
+Render first:
+
+```bash
+scripts/render-routine.sh routines/<basename>.prompt.md > /tmp/<basename>.rendered.md
+```
+
+If the script exits nonzero (unresolvable include, nested include in a
+partial), STOP for this file — report `FAIL <basename> (render error)`
+and do NOT deploy it. A render failure is never deployable.
+
+From the RENDERED output: the YAML frontmatter is everything between
+the first two `---` lines. Extract:
 
 - `name`
 - `trigger_id` (may be absent)
@@ -54,7 +72,13 @@ two `---` lines. Extract:
 - `model`
 - `allowed_tools`
 
-The prompt BODY is everything after the closing `---`.
+The prompt BODY is everything after the closing `---` of the RENDERED
+output. All `update`/`create` content below means this rendered BODY.
+
+Note: editing a partial in `routines/_common/` changes the rendered
+body of EVERY routine that includes it. If a `_common/*.md` file was
+modified this session, treat all cloud routines as candidates and let
+the Step 5 drift check sort out which ones actually changed.
 
 ## Step 3 — Decide what to do per file
 
@@ -94,8 +118,8 @@ substitute only the per-routine fields.**
    - `job_config.ccr.session_context.allowed_tools` ← frontmatter
      `allowed_tools`
    - `job_config.ccr.session_context.model` ← frontmatter `model`
-   - `job_config.ccr.events[0].data.message.content` ← the prompt
-     BODY
+   - `job_config.ccr.events[0].data.message.content` ← the RENDERED
+     prompt BODY (Step 2)
 
 3. **Preserve verbatim** from the canonical response — do NOT drop:
    `job_config.ccr.environment_id`, `mcp_connections`,
@@ -137,15 +161,17 @@ substitute only the per-routine fields.**
 1. Call `RemoteTrigger action=get trigger_id=<file's trigger_id>`.
 
 2. Extract `job_config.ccr.events[0].data.message.content` from the
-   response — this is CLOUD_BODY. Read the file's prompt BODY.
+   response — this is CLOUD_BODY. Take the RENDERED BODY from Step 2.
 
 3. If they match exactly: report `SKIP <basename> (in sync)` and
    move on.
 
-4. If they differ: build the update body by deep-copying the get
-   response and substituting only:
+4. If they differ: show the operator the diff between CLOUD_BODY (the
+   currently-deployed prompt) and the RENDERED BODY before updating —
+   write both to temp files and run `diff -u`. Then build the update
+   body by deep-copying the get response and substituting only:
 
-   - `job_config.ccr.events[0].data.message.content` ← file BODY
+   - `job_config.ccr.events[0].data.message.content` ← RENDERED BODY
    - `job_config.ccr.session_context.allowed_tools` ← frontmatter
      `allowed_tools`
    - `job_config.ccr.session_context.model` ← frontmatter `model`
@@ -159,8 +185,8 @@ substitute only the per-routine fields.**
    resulting body.
 
 6. Verify: re-issue `RemoteTrigger action=get`. The content should
-   now equal file BODY. If not, surface the discrepancy in the
-   report and stop — do not retry blindly.
+   now equal the RENDERED BODY. If not, surface the discrepancy in
+   the report and stop — do not retry blindly.
 
 ## Step 6 — Report
 
@@ -178,6 +204,10 @@ Cloud routine sync:
 
 ## Hard rules
 
+- **Never** send a raw `routines/*.prompt.md` body containing
+  `<!-- include: ... -->` markers to RemoteTrigger. Always render via
+  `scripts/render-routine.sh` first; the deployed blob is the rendered
+  output. Refuse to deploy any file whose render fails.
 - **Never** call `gh workflow run deploy-routines.yml`. The workflow
   is disabled; running it produces no-op success and confuses the
   signal.

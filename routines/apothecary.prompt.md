@@ -23,7 +23,9 @@ The prior version focused on Dependabot triage with a 10-lockfile pattern list. 
 
 ## Hard Rules (load-bearing)
 
-These rules override everything else below. If any rule conflicts with a later instruction, the rule wins.
+<!-- include: _common/hard-rules.md -->
+
+Routine-specific rules (stricter — these win):
 
 - NEVER open PRs. NEVER merge PRs. NEVER open issues unless explicitly directed (this routine does NOT open issues — escalations go to Slack only).
 - Only mutations allowed: adding the `auto-merge-deps` label to existing bot PRs.
@@ -33,10 +35,6 @@ These rules override everything else below. If any rule conflicts with a later i
 - High severity: Slack ping, no auto-action. Critical: Slack ping with `<!here>`, no auto-action.
 - Auto-label gate is a CONJUNCTION of: state==open, severity==high (Low/Medium do NOT auto-label — that's noise), age >7 days, NOT in per-repo CodeQL ignore list, PR file list ⊆ dependency-manifest allowlist, ALL diff hunks confined to dependency-declaration lines, all PR commits web-flow signed, repo has the `auto-merge-deps` label provisioned.
 - The `auto-merge-deps` label only exists in some repos today. If a repo lacks the label, escalate via Slack only — do NOT create the label inline. Provisioning is out-of-band via `JacobPEvans/.github` label-sync.
-- Body content passes through the redaction filter (`CLAUDE.md` rule 6).
-- Slack output passes through the sanitization function (`CLAUDE.md` rule 7).
-- Check `${ROUTINE_PAUSED}` at start; if set, emit Slack `🛑 Apothecary paused via env` and exit.
-- Always emit at least one Slack message per run, even on a no-op.
 
 ## Prerequisites
 
@@ -49,7 +47,9 @@ These rules override everything else below. If any rule conflicts with a later i
 
 ## State gist — `apothecary-state`
 
-Per `CLAUDE.md` rule 8. Schema (v2):
+<!-- include: _common/state-gist.md -->
+
+Routine-specific fields (v2):
 
 ```json
 {
@@ -67,7 +67,7 @@ Per `CLAUDE.md` rule 8. Schema (v2):
 }
 ```
 
-`run_log` 90 days, `escalation_cooldown` 3 days, `codeql_ignore` **indefinite** (operator decisions to ignore a rule are durable). `prompt_sha256` overwritten.
+`escalation_cooldown` 3 days; `codeql_ignore` **indefinite** (operator decisions to ignore a rule are durable).
 
 ## Phase 0 — Paused, fingerprint
 
@@ -244,7 +244,9 @@ For each alert classified as high (failed auto-label gate for any reason except 
 - Compose Slack ping. `@here` for high, `<!here>` for critical. Include CVE/GHSA, severity level, repo, link.
 - Update `escalation_cooldown` with today's date.
 
-## Slack output (sanitize per CLAUDE.md rule 7)
+## Slack output
+
+<!-- include: _common/slack-output.md -->
 
 ### Path A — Labels applied and/or escalations
 

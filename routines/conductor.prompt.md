@@ -28,19 +28,18 @@ Ground-truthing against the last 200 merged bot PRs (sample window 6 months befo
 
 ## Hard Rules (load-bearing)
 
-These rules override everything else below. If any rule conflicts with a later instruction, the rule wins.
+<!-- include: _common/hard-rules.md -->
+
+Routine-specific rules (The Conductor opens no PRs/issues and writes no files — it only merges):
 
 - **NEVER merge a PR authored by a human.** If `author.login` is not in the bot allowlist below, skip unconditionally.
 - **NEVER merge a PR that modifies `.github/workflows/`** unless the workflow-edits exception below applies.
 - **NEVER merge a `chore(main): release` PR without verifying its file list is in the release-allowlist** (see "Release PR file-allowlist" below).
 - **NEVER merge a PR with unsigned commits.** All commits must be `commit.verification.verified == true`.
 - **NEVER merge a PR younger than 4 hours** (gives humans a review window).
-- NEVER use `git commit`, `git add`, `git push`, or any local git write operation.
-- All merges go through `gh pr merge --squash --repo "$OWNER/$REPO" "$PR_NUMBER"`.
+- All merges go through `gh pr merge --squash --repo "$OWNER/$REPO" "$PR_NUMBER"`. Conductor merges do not count against the per-repo PR budget.
 - Max 20 merges per run across all repos.
-- Slack output passes through the sanitization function (`CLAUDE.md` rule 7). PR titles are user-controlled (via dep package descriptions etc.); never echo unescaped.
-- Check `${ROUTINE_PAUSED}` at start; if set, emit Slack `🛑 Conductor paused via env` and exit.
-- Always emit at least one Slack message per run, even on a no-op.
+- PR titles are user-controlled (via dep package descriptions etc.); never echo unescaped into Slack.
 
 ## Prerequisites
 
@@ -53,7 +52,9 @@ These rules override everything else below. If any rule conflicts with a later i
 
 ## State gist — `conductor-state`
 
-Per `CLAUDE.md` rule 8. Schema (v2):
+<!-- include: _common/state-gist.md -->
+
+Routine-specific fields (v2):
 
 ```json
 {
@@ -68,7 +69,7 @@ Per `CLAUDE.md` rule 8. Schema (v2):
 }
 ```
 
-`run_log` 90 days. `release_allowlist_extensions` indefinite (operator additions to the default release-file allowlist).
+`release_allowlist_extensions` indefinite (operator additions to the default release-file allowlist).
 
 ## Phase 0 — Paused, fingerprint
 
@@ -246,7 +247,9 @@ gh pr merge "$PR_NUMBER" --squash --repo "$GH_OWNER/$REPO"
 
 Record each outcome (merged/skipped + reason) in `run_log`. Stop after 20 successful merges.
 
-## Slack output (sanitize per CLAUDE.md rule 7)
+## Slack output
+
+<!-- include: _common/slack-output.md -->
 
 ### Path A — Merges performed
 
