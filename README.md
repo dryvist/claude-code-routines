@@ -15,25 +15,49 @@ design decisions, and lessons learned.
 
 ## Routines
 
-| Routine                | Schedule           | Purpose                       |
-| ---------------------- | ------------------ | ----------------------------- |
-| [Morning Briefing][mb] | Daily 5:00 AM CT   | Read-only activity summary    |
-| [The Sentinel][se]     | Daily 12:33 AM CT  | Param/secret audit + 1 PR     |
-| [The Custodian][cu]    | Daily 2:00 AM CT   | Weighted-random maintenance   |
-| [Issue Solver][is]     | Daily 7am + 7pm CT | Solve one issue → draft PR    |
-| [Daily Polish][dp]     | Daily 11:00 PM CT  | Deep-clean one repo per day   |
-| [Weekly Scorecard][ws] | Mondays 5:00 AM CT | Portfolio health scores       |
+Canonical registry — one row per live trigger, sorted by cron time.
+`trigger_id`s are pinned in each file's YAML frontmatter.
 
-[mb]: routines/morning-briefing.prompt.md
-[se]: routines/sentinel.prompt.md
-[cu]: routines/custodian.prompt.md
-[is]: routines/issue-solver.prompt.md
+| Routine                 | Cron (UTC)       | Purpose                         |
+| ----------------------- | ---------------- | ------------------------------- |
+| [Daily Polish][dp]      | `0 4 * * *`      | Deep-clean one repo per day     |
+| [The Sentinel][se]      | `33 5 * * *`     | Parameterization sweep + 1 PR   |
+| [The Inspector][in]     | `0 6 * * *`      | 3-rule audit → 1 PR or issue    |
+| [The Custodian][cu]     | `0 7 * * *`      | Weighted-random maintenance     |
+| [The Quartermaster][qm] | `0 8 * * *`      | pre-commit pin bumps (≤3 PRs)   |
+| [Docs Sync][ds]         | `13 8 * * 1`     | Weekly docs PRs (both sites)    |
+| [The Archivist][ar]     | `0 9 * * *`      | README quality / docs coverage  |
+| [The Observer][ob]      | `0 10 * * *`     | Daily briefing + Mon repo score |
+| [Weekly Scorecard][ws]  | `7 10 * * 1`     | Estate Consolidation report     |
+| [The Conductor][co]     | `15 11,17 * * *` | Bot-PR allowlist merges         |
+| [The Apothecary][ap]    | `0 13 * * *`     | Security alert triage + labels  |
+| [The Solver][is] (GHA)  | `0 0,12 * * *`   | Solve one task → 1 ready PR     |
+
+The Solver runs as a GitHub Actions workflow
+(`.github/workflows/issue-solver.yml`), not a cloud routine — its
+prompt file has no `trigger_id`.
+
 [dp]: routines/daily-polish.prompt.md
+[se]: routines/sentinel.prompt.md
+[in]: routines/inspector.prompt.md
+[cu]: routines/custodian.prompt.md
+[qm]: routines/quartermaster.prompt.md
+[ds]: routines/docs-sync.prompt.md
+[ar]: routines/archivist.prompt.md
+[ob]: routines/observer.prompt.md
 [ws]: routines/weekly-scorecard.prompt.md
+[co]: routines/conductor.prompt.md
+[ap]: routines/apothecary.prompt.md
+[is]: routines/issue-solver.prompt.md
+
+Retired triggers (disabled in the cloud, no source file): Morning
+Briefing and the original Weekly Scorecard merged into The Observer;
+The Distributor replaced by org Required Workflows. See
+[AGENTS.md](AGENTS.md#retired-routines).
 
 ## Architecture
 
-All 6 routines share a single Claude Code cloud
+All cloud routines share a single Claude Code cloud
 environment and post results to Slack via MCP.
 
 ```text
@@ -156,23 +180,33 @@ fallback, see [CLAUDE.md](CLAUDE.md).
 claude-code-routines/
 ├── README.md
 ├── CLAUDE.md
+├── AGENTS.md
 ├── DESIGN.md
 ├── docs/
-│   └── CLOUD_ROUTINES_AUTH.md
-├── .gitignore
-├── .markdownlint-cli2.yaml
-├── .readme-validator.yaml
+│   ├── CLOUD_ROUTINES_AUTH.md
+│   └── DISTRIBUTOR_RETIREMENT.md
+├── .claude/
+│   ├── settings.json
+│   └── skills/deploy-routine-changes/SKILL.md
 ├── .github/
+│   ├── CODEOWNERS
 │   └── workflows/
-│       ├── deploy-routines.yml
+│       ├── deploy-routines.yml        # disabled (see header)
+│       ├── issue-solver.yml           # The Solver (GHA)
 │       └── prompts/
 │           └── deploy-routines.prompt.md
 └── routines/
     ├── .markdownlint.yaml
+    ├── apothecary.prompt.md
+    ├── archivist.prompt.md
+    ├── conductor.prompt.md
     ├── custodian.prompt.md
     ├── daily-polish.prompt.md
+    ├── docs-sync.prompt.md
+    ├── inspector.prompt.md
     ├── issue-solver.prompt.md
-    ├── morning-briefing.prompt.md
+    ├── observer.prompt.md
+    ├── quartermaster.prompt.md
     ├── sentinel.prompt.md
     └── weekly-scorecard.prompt.md
 ```
