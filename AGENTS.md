@@ -29,7 +29,7 @@ registry for completeness but is not deployed via the cloud-routine path.
   into the new `observer-state` gist's `scorecard_history` field, then
   the legacy gist deleted.
 - **2026-06-09:** The dormant trigger was reused for a new, disjoint
-  scope — Estate Consolidation 2026-06 Linear initiative reporting
+  scope — Estate Consolidation 2026-06 Linear project reporting
   (`routines/weekly-scorecard.prompt.md`). Repo-health scoring stays in
   The Observer; the two Monday messages do not overlap.
 
