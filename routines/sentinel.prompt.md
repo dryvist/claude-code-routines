@@ -24,6 +24,7 @@ Active-credential detection (private keys, AWS access keys, GitHub PATs, JWTs, `
 ## Hard Rules (load-bearing)
 
 <!-- include: _common/hard-rules.md -->
+<!-- include: _common/redaction.md -->
 
 Routine-specific rules:
 
@@ -40,13 +41,7 @@ Routine-specific rules:
 
 ## Prerequisites
 
-`gh`, `jq`, `base64` are pre-installed. `gh` is authenticated via `GH_TOKEN`. Required env vars on the routine env:
-
-- `GH_TOKEN` — PAT with `repo` + `read:org` scopes (the latter is required for org enumeration).
-- `GH_OWNER` — single GitHub org/user to scan.
-- `GIT_COMMITTER_NAME` / `GIT_COMMITTER_EMAIL` — bot identity for the Contents API committer object.
-- `PROMPT_SOURCE_URL` — link to this prompt for the PR-body footer.
-- `SENTINEL_OPERATOR_PATTERNS` (optional) — comma-separated regex list of extra operator-specific patterns to flag (internal hostnames, project codenames, etc.).
+<!-- include: _common/prerequisites.md -->
 
 ## State gist — `sentinel-state`
 
@@ -194,7 +189,7 @@ Slug = first 3–4 words of a short description of the fix, kebab-cased, lowerca
      --body-file /tmp/pr-body.md
    ```
 
-6. Apply the `cloud-routine` label (already propagated to every public repo via `JacobPEvans/.github` label-sync):
+6. Apply the `cloud-routine` label (already propagated to every public repo via `dryvist/.github` label-sync):
 
    ```bash
    gh pr edit "$PR_NUMBER" --repo $GH_OWNER/$REPO --add-label cloud-routine

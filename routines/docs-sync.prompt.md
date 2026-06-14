@@ -26,6 +26,7 @@ requested but not finished, as future work.
 ## Hard Rules (load-bearing)
 
 <!-- include: _common/hard-rules.md -->
+<!-- include: _common/redaction.md -->
 
 Routine-specific rules:
 
@@ -60,15 +61,7 @@ emoji — the no-emoji rule covers PR/issue titles and bodies only.
 
 ## Prerequisites
 
-`gh` is pre-installed and authenticated via `GH_TOKEN`. Expected env:
-
-- `GH_OWNER` — single owner/org to scan for changes (default `dryvist`).
-- `DOCS_OWNER` — owner of the two doc repos (default `dryvist`).
-- `GIT_COMMITTER_NAME` / `GIT_COMMITTER_EMAIL` — bot identity for signed commits.
-- `PROMPT_SOURCE_URL` — link to this prompt, for the PR footer.
-
-Standard tools only (`gh`, `jq`, `base64`, `date`). The secret-scan gate runs in
-`docs` CI, not here — this routine does not run gitleaks.
+<!-- include: _common/prerequisites.md -->
 
 ## Targets
 

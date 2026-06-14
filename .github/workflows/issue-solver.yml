@@ -21,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Mint JacobPEvans-claude installation token
+      - name: Mint dryvist-claude installation token
         id: app-token
         uses: actions/create-github-app-token@v3
         with:
@@ -52,13 +52,13 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: >-
             Read routines/issue-solver.prompt.md and follow every instruction
-            in it. You are running inside GitHub Actions with a
-            JacobPEvans-claude App installation token in $GH_TOKEN, and a
+            We run the prompt natively inside Actions, passing the
+            dryvist-claude App installation token in $GH_TOKEN, and a
             Linear Personal API Key in $LINEAR_API_KEY (scoped to JAC team
             only). All target-repo file changes go through the GraphQL
             createCommitOnBranch mutation
-            (`gh api graphql --input -`); GitHub auto-signs and attributes
-            those commits to JacobPEvans-claude[bot]. Do not fall back to
+            mutation (via `gh api graphql`) from the prompt to attribute
+            those commits to dryvist-claude[bot]. Do not fall back to
             the Contents API PUT, and do not attempt git push/commit/add
             against target repos — both paths land unsigned or
             wrong-identity commits and the tool allowlist blocks them.

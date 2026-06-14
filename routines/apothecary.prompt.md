@@ -24,6 +24,7 @@ The prior version focused on Dependabot triage with a 10-lockfile pattern list. 
 ## Hard Rules (load-bearing)
 
 <!-- include: _common/hard-rules.md -->
+<!-- include: _common/redaction.md -->
 
 Routine-specific rules (stricter — these win):
 
@@ -34,16 +35,14 @@ Routine-specific rules (stricter — these win):
 - **Severity-missing → fail closed.** Slack-only, never auto-label.
 - High severity: Slack ping, no auto-action. Critical: Slack ping with `<!here>`, no auto-action.
 - Auto-label gate is a CONJUNCTION of: state==open, severity==high (Low/Medium do NOT auto-label — that's noise), age >7 days, NOT in per-repo CodeQL ignore list, PR file list ⊆ dependency-manifest allowlist, ALL diff hunks confined to dependency-declaration lines, all PR commits web-flow signed, repo has the `auto-merge-deps` label provisioned.
-- The `auto-merge-deps` label only exists in some repos today. If a repo lacks the label, escalate via Slack only — do NOT create the label inline. Provisioning is out-of-band via `JacobPEvans/.github` label-sync.
+- The `auto-merge-deps` label only exists in some repos today. If a repo lacks the label, escalate via Slack only — do NOT create the label inline. Provisioning is out-of-band via `dryvist/.github` label-sync.
 
 ## Prerequisites
 
-`gh`, `jq`, `sha256sum` are pre-installed. `gh` is authenticated via `GH_TOKEN`. Required env vars:
+<!-- include: _common/prerequisites.md -->
 
-- `GH_TOKEN` — PAT with `repo` + `read:org` + `security_events` scopes.
-- `GH_OWNER` — single owner/org.
-- `PROMPT_SOURCE_URL` — link to this prompt.
-- `ROUTINE_PAUSED` — kill switch.
+Routine-specific prerequisites:
+- `GH_TOKEN` requires `security_events` scope.
 
 ## State gist — `apothecary-state`
 
@@ -59,23 +58,15 @@ Routine-specific fields (v2):
     {"ts":"...","repo":"...","action":"label_added|escalated|skipped","resource_id":"","reason":""}
   ],
   "escalation_cooldown": {
-    "JacobPEvans/foo:42": "2026-06-01T00:00:00Z"
+    "dryvist/foo:42": "2026-06-01T00:00:00Z"
   },
   "codeql_ignore": {
-    "JacobPEvans/foo": ["js/sql-injection", "py/path-injection"]
+    "dryvist/foo": ["js/sql-injection", "py/path-injection"]
   }
 }
 ```
 
 `escalation_cooldown` 3 days; `codeql_ignore` **indefinite** (operator decisions to ignore a rule are durable).
-
-## Phase 0 — Paused, fingerprint
-
-If `${ROUTINE_PAUSED}` non-empty: Slack `🛑 Apothecary paused via env`, exit.
-
-Compute prompt fingerprint, write to state.
-
-(C1 per-repo budget doesn't apply — Apothecary opens no PRs.)
 
 ## Phase 1 — Enumerate target repos
 
@@ -85,7 +76,9 @@ gh repo list "$GH_OWNER" --limit 100 \
   | jq '[.[] | select(.isArchived==false) | .name]'
 ```
 
-Apply the skip-list (mirrors, abandoned, profile/meta — same set as Distributor).
+Apply the global skip-list:
+
+<!-- include: _common/skip-list.md -->
 
 ## Phase 2 — Fetch open CodeQL alerts (primary)
 
@@ -222,7 +215,7 @@ gh label list --repo "$GH_OWNER/$REPO" --search auto-merge-deps --json name \
   --jq 'length'
 ```
 
-If 0: skip the auto-label, escalate to Slack with `[label missing]` annotation. Operator decides whether to add via `JacobPEvans/.github` label-sync.
+If 0: skip the auto-label, escalate to Slack with `[label missing]` annotation. Operator decides whether to add via `dryvist/.github` label-sync.
 
 ### Gate 8 — Already labeled / cap
 

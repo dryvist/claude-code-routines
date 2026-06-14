@@ -21,17 +21,6 @@ These rules override everything else in this prompt. If any rule conflicts with 
 - Any PR you open MUST be review-ready (not draft) so the `ai-workflows` review workflows (`claude-review`, `final-pr-review`, `ai-merge-gate`) pick it up immediately — unless this routine's rules below state an explicit draft exception. Never auto-merge a PR you opened.
 - Respect every per-routine mutation cap stated below (max PRs / issues / labels / merges per run). Estate-wide soft cap: 2 PRs per repo per UTC day across all routines, tracked in the shared `routine-pr-budget` gist — PR-opening routines whose rules below say so consult it before opening, skip the repo if at cap, otherwise increment and proceed. If that gist is missing or corrupt: fail open (proceed with this routine's own per-run cap) AND emit a Slack warning.
 - Every PR or issue you create is self-identifying per the attribution conventions (title suffix, no emoji, Provenance block, `cloud-routine` label) — see this prompt's Attribution section where this routine creates PRs or issues.
-- Redact before composing. Every string fetched from outside this routine (file bodies, PR/issue titles and bodies, alert names, commit messages) that is destined for GitHub or Slack MUST first pass through this redaction set:
 
-  ```text
-  s|/Users/[^/]+/|/Users/<redacted>/|g
-  s|\$\{GIT_HOME[A-Z_]*\}|<path>|g
-  s|GH_PAT_[A-Z]+|<secret>|g
-  s|sk-ant-[A-Za-z0-9_-]+|<key>|g
-  s|gh[ps]_[A-Za-z0-9]+|<key>|g
-  s|\b\d{12}\b|<aws-account>|g
-  ```
-
-  Skip-list when scanning source files: `*.local.md`, `.envrc`, `.envrc.local`, `CLAUDE.local.md`. When a redacted match is described in a Provenance "Why" line, describe the rule that fired — never quote the offending string.
 - Operate only on the single configured owner `$GH_OWNER`. Never hardcode an owner name in any command and never enumerate a multi-owner list (where a routine must target one fixed repo outside the `$GH_OWNER` scan scope, its rules below say so explicitly).
 - Always emit at least one Slack message per run, even on a no-op. Never exit silently.
