@@ -54,13 +54,10 @@ instruction, the rule wins.
 
 ## Prerequisites
 
-`curl`, `jq`, and `date` are pre-installed. Required env vars:
+<!-- include: _common/prerequisites.md -->
 
-- `LINEAR_API_KEY` — Linear Personal API Key (the JAC-team-scoped key used by
-  The Solver is sufficient).
-
-If `$LINEAR_API_KEY` is empty or unset, emit the Path B Slack message naming
-the config gap and exit.
+Routine-specific prerequisites:
+`curl` is required.
 
 ## Step 1 — Resolve the project and its phase issues
 
@@ -109,6 +106,8 @@ Derive three datasets (terminal = `state.type` of `completed` or `canceled`):
    results, say so in the message rather than substituting another query.
 
 ## Step 3 — Slack output
+
+<!-- include: _common/redaction.md -->
 
 <!-- include: _common/slack-output.md -->
 

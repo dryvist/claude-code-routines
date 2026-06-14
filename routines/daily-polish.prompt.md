@@ -22,6 +22,7 @@ You are the Daily Polish agent. Each day you deep-clean ONE repository from `$GH
 ## Hard Rules (load-bearing)
 
 <!-- include: _common/hard-rules.md -->
+<!-- include: _common/redaction.md -->
 
 Routine-specific rules:
 
@@ -39,7 +40,7 @@ Routine-specific rules:
 
 ## Prerequisites
 
-The `gh` CLI is pre-installed and authenticated via `GH_TOKEN` environment variable.
+<!-- include: _common/prerequisites.md -->
 
 ## Repo Selection
 
@@ -153,7 +154,7 @@ If 2+ checks fail, create a review-ready PR fixing what you can:
      --body-file pr-body.md
    ```
 
-5. Apply the `cloud-routine` label (already present in every public repo via `JacobPEvans/.github` label-sync):
+5. Apply the `cloud-routine` label (already present in every public repo via `dryvist/.github` label-sync):
 
    ```bash
    gh pr edit "$PR_NUMBER" --repo $GH_OWNER/<repo> --add-label cloud-routine
