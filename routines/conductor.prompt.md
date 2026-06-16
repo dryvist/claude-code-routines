@@ -29,6 +29,7 @@ Ground-truthing against the last 200 merged bot PRs (sample window 6 months befo
 ## Hard Rules (load-bearing)
 
 <!-- include: _common/hard-rules.md -->
+<!-- include: _common/redaction.md -->
 
 Routine-specific rules (The Conductor opens no PRs/issues and writes no files — it only merges):
 
@@ -43,12 +44,7 @@ Routine-specific rules (The Conductor opens no PRs/issues and writes no files �
 
 ## Prerequisites
 
-`gh`, `jq`, `sha256sum` are pre-installed. `gh` is authenticated via `GH_TOKEN`. Required env vars:
-
-- `GH_TOKEN` — PAT with `repo` + `read:org` scopes.
-- `GH_OWNER` — single owner/org.
-- `PROMPT_SOURCE_URL` — link to this prompt.
-- `ROUTINE_PAUSED` — kill switch.
+<!-- include: _common/prerequisites.md -->
 
 ## State gist — `conductor-state`
 
@@ -64,18 +60,12 @@ Routine-specific fields (v2):
     {"ts":"...","repo":"...","action":"merged|skipped","resource_id":"<PR url>","reason":""}
   ],
   "release_allowlist_extensions": {
-    "JacobPEvans/foo": ["Cargo.toml", "src/version.txt"]
+    "dryvist/foo": ["Cargo.toml", "src/version.txt"]
   }
 }
 ```
 
 `release_allowlist_extensions` indefinite (operator additions to the default release-file allowlist).
-
-## Phase 0 — Paused, fingerprint
-
-If `${ROUTINE_PAUSED}` non-empty: Slack `🛑 Conductor paused via env`, exit.
-
-Compute prompt fingerprint, write to state.
 
 ## Bot author allowlist (corrected against 200-PR sample)
 

@@ -21,6 +21,7 @@ You are The Inspector — a daily estate-wide auditor for the `$GH_OWNER` GitHub
 ## Hard Rules (load-bearing)
 
 <!-- include: _common/hard-rules.md -->
+<!-- include: _common/redaction.md -->
 
 Routine-specific rules:
 
@@ -36,13 +37,10 @@ Routine-specific rules:
 
 ## Prerequisites
 
-`gh`, `jq`, `base64`, `python3`, `sha256sum` are pre-installed. `gh` is authenticated via `GH_TOKEN`. Required env vars:
+<!-- include: _common/prerequisites.md -->
 
-- `GH_TOKEN` — PAT with `repo` + `read:org` scopes.
-- `GH_OWNER` — single owner/org to audit.
-- `GIT_COMMITTER_NAME` / `GIT_COMMITTER_EMAIL` — bot identity for the Contents API committer object.
-- `PROMPT_SOURCE_URL` — link to this prompt for PR/issue Provenance.
-- `ROUTINE_PAUSED` — kill switch.
+Routine-specific prerequisites:
+`python3` is required.
 
 ## State gist — `inspector-state`
 
@@ -59,13 +57,13 @@ Routine-specific fields (v2):
     {"ts":"...","repo":"...","action":"pr_opened|issue_opened|no_violations|skipped","resource_id":"...","reason":""}
   ],
   "cooldowns": {
-    "JacobPEvans/foo:claude-md-staleness": "2026-06-01T00:00:00Z"
+    "dryvist/foo:claude-md-staleness": "2026-06-01T00:00:00Z"
   },
   "content_hashes": {
-    "JacobPEvans/foo:CLAUDE.md": "abc123..."
+    "dryvist/foo:CLAUDE.md": "abc123..."
   },
   "resolved_paths": {
-    "JacobPEvans/foo": {"docs/CLOUD_ROUTINES_AUTH.md": true}
+    "dryvist/foo": {"docs/CLOUD_ROUTINES_AUTH.md": true}
   }
 }
 ```

@@ -229,11 +229,11 @@ identity/auth/signing model in one place).
      "schema_version": 2,
      "prompt_sha256": "abc123…",
      "run_log": [
-       {"ts":"2026-05-25T14:00:00Z","repo":"JacobPEvans/nix-darwin",
+       {"ts":"2026-05-25T14:00:00Z","repo":"dryvist/nix-darwin",
         "action":"pr_opened","resource_id":"https://github.com/...","reason":""}
      ],
-     "closed_pairs": {"JacobPEvans/foo": ["bar.yml"]},
-     "cooldowns": {"JacobPEvans/foo": "2026-06-01T00:00:00Z"}
+     "closed_pairs": {"dryvist/foo": ["bar.yml"]},
+     "cooldowns": {"dryvist/foo": "2026-06-01T00:00:00Z"}
    }
    ```
 
@@ -252,8 +252,8 @@ identity/auth/signing model in one place).
 
    ```json
    {
-     "2026-05-25": {"JacobPEvans/nix-darwin": 1,
-                    "JacobPEvans/ai-workflows": 2}
+     "2026-05-25": {"dryvist/nix-darwin": 1,
+                    "dryvist/ai-workflows": 2}
    }
    ```
 
@@ -269,7 +269,7 @@ identity/auth/signing model in one place).
     `prompt_sha256` entry to the state gist (overwrites the
     previous entry — only the most-recent fingerprint is needed).
     Sentinel cross-checks this against `sha256` of the prompt file
-    at HEAD of `main` in `JacobPEvans/claude-code-routines`; a
+    at HEAD of `main` in `dryvist/claude-code-routines`; a
     mismatch indicates the cloud deployment is stale or has been
     mutated out-of-band.
 
@@ -340,7 +340,7 @@ gh pr edit "$PR_NUMBER" --repo "$OWNER/$REPO" --add-label cloud-routine
 gh issue edit "$ISSUE_NUMBER" --repo "$OWNER/$REPO" --add-label cloud-routine
 ```
 
-The label is defined in `JacobPEvans/.github/.github/labels.yml` and
+The label is defined in `dryvist/.github/.github/labels.yml` and
 propagated to every public repo by the `label-sync.yml` workflow —
 routines do NOT need to `gh label create` per repo. If a label-add
 call fails because the target repo is private and outside the sync

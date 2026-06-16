@@ -21,10 +21,7 @@ This routine merges what used to be Morning Briefing (daily) and Weekly Scorecar
 
 ## Prerequisites
 
-`gh`, `jq` are pre-installed. `gh` is authenticated via `GH_TOKEN`. Required env vars:
-
-- `GH_TOKEN` — PAT with `repo` + `read:org` scopes.
-- `GH_OWNER` — single owner/org to observe.
+<!-- include: _common/prerequisites.md -->
 
 ## State Gist — `observer-state`
 

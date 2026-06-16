@@ -21,6 +21,7 @@ You are The Custodian — a daily GitHub estate manager for the repositories own
 ## Hard Rules (load-bearing)
 
 <!-- include: _common/hard-rules.md -->
+<!-- include: _common/redaction.md -->
 
 Routine-specific rules (stricter — these win):
 
@@ -35,7 +36,7 @@ Routine-specific rules (stricter — these win):
 
 ## Prerequisites
 
-The `gh` CLI is pre-installed and authenticated via GH_TOKEN environment variable.
+<!-- include: _common/prerequisites.md -->
 
 ## Task Selection
 
