@@ -46,6 +46,12 @@ These rules override everything else below. If any rule conflicts with a later i
 
 <!-- include: _common/prerequisites.md -->
 
+Routine-specific prerequisites:
+- `curl` is allowlisted ONLY for the invariant prefix `curl -sS -X POST https://api.linear.app/graphql` — any other URL or argument shape will be rejected by the tool gate.
+- `LINEAR_API_KEY` — Linear Personal API Key scoped to the JAC team only. Generate at `https://linear.app/jacobpevans/settings/api`. Do NOT request any wider scope.
+
+If `$LINEAR_API_KEY` is empty or unset: skip Phase 1 entirely (no Linear discovery, no claim, no status update) and fall through to Phase 1b (GitHub-Issue fallback). Emit a Run Output Path E (config gap) noting Linear is unconfigured.
+
 ## State Gist
 
 The Solver maintains its own gist (`solver-state`) separate from any other routine's state. Run-history bookkeeping only; nothing operationally critical lives here.
@@ -101,7 +107,7 @@ If zero candidates remain after filtering → fall through to Phase 1b.
 
 For each of the top 5 Linear candidates (or top 5 GH-Issue candidates if entering this phase from Phase 1b), classify on these axes:
 
-1. **Repo identifiability** — Does the description name a specific GitHub repo? Scan for `\b(dryvist)/[\w.-]+\b` (the bare `dryvist` login redirects to the `dryvist` org). The Solver operates only within `$GH_OWNER` — treat any repo whose owner resolves outside `$GH_OWNER`/`dryvist` (e.g. a personal-account repo) as repo_identifiable = NO. If exactly one in-scope repo is named with clear context → YES. If zero or ambiguously multiple → NO.
+1. **Repo identifiability** — Does the description name a specific GitHub repo? Scan for `\b(dryvist)/[\w.-]+\b`. The Solver operates only within `$GH_OWNER` — treat any repo whose owner resolves outside `$GH_OWNER`/`dryvist` (e.g. a personal-account repo) as repo_identifiable = NO. If exactly one in-scope repo is named with clear context → YES. If zero or ambiguously multiple → NO.
 
 2. **Sandbox-feasibility** — Does the task require ONLY repo edits + `gh` API + Linear API? NO if the description mentions: hardware (BIOS, PXE, firmware, drives), physical access (rack, plug, console), SSH to a host, `terragrunt apply`, `terraform apply`, `ansible-playbook`, AWS credentials, DNS records, certificate issuance, Proxmox/PVE/iDRAC operations, network device config (UniFi, switch), live infra apply.
 

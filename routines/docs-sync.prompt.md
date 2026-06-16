@@ -63,6 +63,10 @@ emoji — the no-emoji rule covers PR/issue titles and bodies only.
 
 <!-- include: _common/prerequisites.md -->
 
+Routine-specific prerequisites:
+- `DOCS_OWNER` — owner of the two doc repos (default `dryvist`).
+- The secret-scan gate runs in `docs` CI, not here — this routine does not run gitleaks.
+
 ## Targets
 
 | Repo | Visibility | Framework | Content root | Nav |

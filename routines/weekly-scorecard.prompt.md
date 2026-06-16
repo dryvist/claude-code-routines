@@ -57,7 +57,10 @@ instruction, the rule wins.
 <!-- include: _common/prerequisites.md -->
 
 Routine-specific prerequisites:
-`curl` is required.
+- `curl` is required.
+- `LINEAR_API_KEY` — Linear Personal API Key (the JAC-team-scoped key used by The Solver is sufficient).
+
+If `$LINEAR_API_KEY` is empty or unset, emit the Path B Slack message naming the config gap and exit.
 
 ## Step 1 — Resolve the project and its phase issues
 
