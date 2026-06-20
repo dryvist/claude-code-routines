@@ -1,13 +1,14 @@
 ---
-# Versioned-prompt repo, not a software package — default
-# Installation/Usage/API headings don't fit.
+# Standard headings: every README must carry Installation and Usage.
 
 required_sections:
-  - Routines
-  - Deploying Changes
+  - Installation
+  - Usage
 
 optional_sections:
+  - Routines
   - Architecture
   - Environment Setup
+  - Deploying Changes
   - File Structure
   - License

@@ -25,7 +25,7 @@ Canonical registry — one row per live trigger, sorted by cron time.
 | [The Inspector][in]     | `0 6 * * *`      | 3-rule audit → 1 PR or issue    |
 | [The Custodian][cu]     | `0 7 * * *`      | Weighted-random maintenance     |
 | [The Quartermaster][qm] | `0 8 * * *`      | pre-commit pin bumps (≤3 PRs)   |
-| [Docs Sync][ds]         | `13 8 * * 1`     | Weekly docs PRs (both sites)    |
+| [Docs Sync][ds]         | `13 8 * * 1`     | Weekly documentation PRs        |
 | [The Archivist][ar]     | `0 9 * * *`      | README quality / docs coverage  |
 | [The Observer][ob]      | `0 10 * * *`     | Daily briefing + Mon repo score |
 | [Weekly Scorecard][ws]  | `7 10 * * 1`     | Estate Consolidation report     |
@@ -152,6 +152,22 @@ Each routine connects to Slack for output:
 - **Name**: `Slack`
 - **URL**: `https://mcp.slack.com/mcp`
 
+## Usage
+
+Once the shared cloud environment is configured, the routines run
+themselves — no manual invocation. Each trigger fires on its cron
+schedule (see the [Routines](#routines) table), scopes its work to
+the single `$GH_OWNER`, performs its task against the GitHub API, and
+posts a summary to Slack. The Solver runs on its own GitHub Actions
+schedule instead of a cloud trigger.
+
+To change behaviour, edit the relevant `routines/*.prompt.md` file and
+let the deploy path re-sync the cloud trigger (see
+[Deploying Changes](#deploying-changes)). To add a routine, copy an
+existing prompt file, give it a unique `cron` value in the YAML
+frontmatter, and deploy — registration issues and back-commits the new
+`trigger_id`.
+
 ## Deploying Changes
 
 The GHA-based deploy at [`.github/workflows/deploy-routines.yml`][dw]
@@ -230,3 +246,8 @@ claude-code-routines/
 ## License
 
 MIT
+
+---
+
+> Part of a [larger ecosystem of ~40 repos](https://docs.jacobpevans.com) —
+> see how it all fits together.
