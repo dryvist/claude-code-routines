@@ -42,6 +42,12 @@ jobs:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
         with:
           github_token: ${{ steps.app-token.outputs.token }}
+          # On `schedule` runs github.actor is `jacobpevans`, a login that no
+          # longer resolves after the account rename to JacobPEvans-personal.
+          # claude-code-action's human-actor check 404s on it, treats it as a
+          # bot, and aborts unless allow-listed. Triggers here are schedule +
+          # workflow_dispatch only (no untrusted-actor path), so `*` is safe.
+          allowed_bots: "*"
           # NOTE: this param may be vestigial. The Solver authenticates via
           # the App installation token in $GH_TOKEN (see env: above); the prompt
           # never reads $CLAUDE_CODE_OAUTH_TOKEN. The Routines-API breakage
