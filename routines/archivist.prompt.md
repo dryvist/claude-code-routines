@@ -4,6 +4,7 @@ trigger_id: trig_01U6EPmvAdUDy2k7LfYWkqts
 cron: "0 9 * * *"
 cron_human: Daily at 9:00 UTC (4:00 AM CT)
 model: claude-sonnet-4-6
+autofix: true
 allowed_tools:
   - Bash
   - Read

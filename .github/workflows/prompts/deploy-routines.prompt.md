@@ -19,8 +19,16 @@ Instructions for Claude when invoked by `.github/workflows/deploy-routines.yml`.
 For every file matching `routines/*.prompt.md` in this checkout:
 
 1. Read the file. Parse the YAML frontmatter for `trigger_id`, `cron`,
-   `model`, and `allowed_tools`. Extract the body below the closing
-   `---` of the frontmatter — call it BODY.
+   `model`, `allowed_tools`, and `autofix` (absent → `false`). Extract
+   the body below the closing `---` of the frontmatter — call it BODY.
+   Read the pinned cloud environment id once, and set
+   `job_config.ccr.environment_id` to it on every create/update:
+
+   ```bash
+   ENVIRONMENT_ID=$(grep -m1 '^ENVIRONMENT_ID=' \
+     routines/_common/deploy.config | cut -d= -f2)
+   ```
+
 2. **If the frontmatter has no `trigger_id` field**, distinguish two
    cases using the `cron` field:
    - `cron` is **absent** → the file is a GitHub-Actions-managed prompt
@@ -34,17 +42,23 @@ For every file matching `routines/*.prompt.md` in this checkout:
      `RemoteTrigger create`, missing required field, etc.), print
      `FAIL <basename> — auto-create failed: <reason>` and move on.
 3. Call `RemoteTrigger` with `action: get` for the `trigger_id`.
-   Extract the current cloud body from
-   `job_config.ccr.events[0].data.message.content`. If it equals BODY
-   exactly, print `SKIP <basename> (in sync)` and move to the next
-   file — do not call `update`.
-4. If BODY differs, call the `RemoteTrigger` tool with `action: update`,
-   the file's `trigger_id`, and this body shape:
+   Compare three things to the desired state: the cloud body
+   (`job_config.ccr.events[0].data.message.content`) vs BODY, the cloud
+   `job_config.ccr.environment_id` vs `$ENVIRONMENT_ID`, and
+   `job_config.ccr.session_context.autofix_on_pr_create` vs frontmatter
+   `autofix`. If ALL THREE match, print `SKIP <basename> (in sync)` and
+   move to the next file — do not call `update`.
+4. If any of the three differ, call `RemoteTrigger` with
+   `action: update`, the file's `trigger_id`, and the COMPLETE `ccr`
+   below. `update` REPLACES `job_config.ccr` wholesale — a partial
+   `ccr` (e.g. omitting `events`) WIPES the prompt body, so always
+   send `environment_id` + `events` + `session_context` together:
 
    ```json
    {
      "job_config": {
        "ccr": {
+         "environment_id": "<$ENVIRONMENT_ID>",
          "events": [{
            "data": {
              "message": {
@@ -56,7 +70,8 @@ For every file matching `routines/*.prompt.md` in this checkout:
          }],
          "session_context": {
            "allowed_tools": "<from frontmatter>",
-           "model": "<from frontmatter>"
+           "model": "<from frontmatter>",
+           "autofix_on_pr_create": <frontmatter autofix, default false>
          }
        }
      }
@@ -64,8 +79,10 @@ For every file matching `routines/*.prompt.md` in this checkout:
    ```
 
 5. Verify the update by calling `RemoteTrigger` `action: get` for the
-   same `trigger_id` and confirming the returned
-   `job_config.ccr.events[0].data.message.content` equals BODY exactly.
+   same `trigger_id` and confirming: the returned
+   `job_config.ccr.events[0].data.message.content` equals BODY exactly,
+   `environment_id` equals `$ENVIRONMENT_ID`, and
+   `autofix_on_pr_create` equals the frontmatter `autofix`.
 
 Print one `CREATED <basename> trigger_id=<id>`, `PASS <basename>`,
 `SKIP <basename> (in sync)`, or `FAIL <basename> — <reason>` line per
@@ -87,16 +104,19 @@ A) Fetch the canonical request shape from an existing cloud routine
    `cron_expression`, the frontmatter field is `cron`);
    `job_config.ccr.session_context.allowed_tools` ← frontmatter
    `allowed_tools`; `job_config.ccr.session_context.model` ←
-   frontmatter `model`; `job_config.ccr.events[0].data.message.content`
+   frontmatter `model`;
+   `job_config.ccr.session_context.autofix_on_pr_create` ← frontmatter
+   `autofix` (absent → `false`); `job_config.ccr.environment_id` ←
+   `$ENVIRONMENT_ID`; `job_config.ccr.events[0].data.message.content`
    ← the prompt BODY.
 
    **Preserve verbatim from the canonical response — do not drop
-   any of these:** `job_config.ccr.environment_id` (the cloud rejects
-   creates without it with HTTP 400 `ccr.environment_id required`),
-   `mcp_connections` (otherwise the new routine has no Slack
-   wiring), `persist_session`, and any other top-level field the
-   canonical shape contains that the substitution list above does
-   not override.
+   any of these:** `mcp_connections` (otherwise the new routine has no
+   Slack wiring), `persist_session`, and any other top-level field the
+   canonical shape contains that the substitution list above does not
+   override. `environment_id` must be present — it is set from
+   `$ENVIRONMENT_ID` above (the cloud rejects creates without it:
+   HTTP 400 `ccr.environment_id required`).
 
    Treat the canonical response as the single source of truth for
    field names and required values. The substitution list is what

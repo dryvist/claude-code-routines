@@ -4,6 +4,7 @@ trigger_id: trig_01J9F82aQp1NX5W8PcvSXyh6
 cron: "13 8 * * 1"
 cron_human: Weekly on Mondays at 08:13 UTC (≈3:13 AM CT / 4:13 AM ET)
 model: claude-sonnet-4-6
+autofix: true
 allowed_tools:
   - Bash
   - Read
@@ -64,6 +65,7 @@ emoji — the no-emoji rule covers PR/issue titles and bodies only.
 <!-- include: _common/prerequisites.md -->
 
 Routine-specific prerequisites:
+
 - `DOCS_OWNER` — owner of the two doc repos (default `dryvist`).
 - The secret-scan gate runs in `docs` CI, not here — this routine does not run gitleaks.
 
