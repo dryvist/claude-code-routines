@@ -71,9 +71,21 @@ the first two `---` lines. Extract:
 - `cron` (may be absent)
 - `model`
 - `allowed_tools`
+- `autofix` (may be absent → treat as `false`)
 
 The prompt BODY is everything after the closing `---` of the RENDERED
 output. All `update`/`create` content below means this rendered BODY.
+
+Also read the single pinned cloud environment id once per run — the
+repo, not the cloud UI, owns which environment each routine runs in:
+
+```bash
+ENVIRONMENT_ID=$(grep -m1 '^ENVIRONMENT_ID=' routines/_common/deploy.config | cut -d= -f2 | tr -d '\r')
+```
+
+Every create/update below sets `job_config.ccr.environment_id` to
+`$ENVIRONMENT_ID`. The environment's secrets (`GH_OWNER`, `GH_TOKEN`)
+live only in the cloud — this pins WHICH environment, not what's in it.
 
 Note: editing a partial in `routines/_common/` changes the rendered
 body of EVERY routine that includes it. If a `_common/*.md` file was
@@ -118,13 +130,18 @@ substitute only the per-routine fields.**
    - `job_config.ccr.session_context.allowed_tools` ← frontmatter
      `allowed_tools`
    - `job_config.ccr.session_context.model` ← frontmatter `model`
+   - `job_config.ccr.session_context.autofix_on_pr_create` ←
+     frontmatter `autofix` (absent → `false`)
+   - `job_config.ccr.environment_id` ← `$ENVIRONMENT_ID` from
+     `routines/_common/deploy.config` (Step 2)
    - `job_config.ccr.events[0].data.message.content` ← the RENDERED
      prompt BODY (Step 2)
 
 3. **Preserve verbatim** from the canonical response — do NOT drop:
-   `job_config.ccr.environment_id`, `mcp_connections`,
-   `persist_session`, and any other top-level fields. Dropping
-   `environment_id` produces HTTP 400 `ccr.environment_id required`.
+   `mcp_connections`, `persist_session`, and any other top-level
+   fields. `environment_id` must be present (set it from
+   `$ENVIRONMENT_ID` per the substitution above — the cloud rejects
+   creates without it: HTTP 400 `ccr.environment_id required`).
    Also keep the existing nesting under
    `job_config.ccr.events[0].data` — in particular `type: "user"`
    sits *inside* `data` as a sibling of `message`, not above it.
@@ -160,33 +177,53 @@ substitute only the per-routine fields.**
 
 1. Call `RemoteTrigger action=get trigger_id=<file's trigger_id>`.
 
-2. Extract `job_config.ccr.events[0].data.message.content` from the
-   response — this is CLOUD_BODY. Take the RENDERED BODY from Step 2.
+2. From the response capture: CLOUD_BODY
+   (`job_config.ccr.events[0].data.message.content`),
+   `job_config.ccr.environment_id`, and
+   `job_config.ccr.session_context.autofix_on_pr_create`. Take the
+   RENDERED BODY, `$ENVIRONMENT_ID`, and the frontmatter `autofix`
+   from Step 2. Normalize both `autofix_on_pr_create` and frontmatter
+   `autofix` to `false` when absent or `null` before comparing — older
+   routines may lack the field and the API may omit falsey values.
 
-3. If they match exactly: report `SKIP <basename> (in sync)` and
-   move on.
+3. **In sync only if ALL THREE match**: CLOUD_BODY == RENDERED BODY,
+   `environment_id` == `$ENVIRONMENT_ID`, and `autofix_on_pr_create`
+   == frontmatter `autofix`. If so, report `SKIP <basename> (in sync)`
+   and move on. (Body-only checks let an out-of-band env or autofix
+   drift slip through — that is exactly the bug this guards against.)
 
-4. If they differ: show the operator the diff between CLOUD_BODY (the
-   currently-deployed prompt) and the RENDERED BODY before updating —
-   write both to temp files and run `diff -u`. Then build the update
-   body by deep-copying the get response and substituting only:
+4. If any differ: show the operator the body diff (write CLOUD_BODY
+   and RENDERED BODY to temp files, `diff -u`) and note any env /
+   autofix change. Then build the update body by deep-copying the get
+   response and substituting only:
 
    - `job_config.ccr.events[0].data.message.content` ← RENDERED BODY
    - `job_config.ccr.session_context.allowed_tools` ← frontmatter
      `allowed_tools`
    - `job_config.ccr.session_context.model` ← frontmatter `model`
+   - `job_config.ccr.session_context.autofix_on_pr_create` ←
+     frontmatter `autofix` (absent → `false`)
+   - `job_config.ccr.environment_id` ← `$ENVIRONMENT_ID`
    - top-level `cron_expression` ← frontmatter `cron`
 
    Preserve everything else verbatim — same rule as Step 4,
    including the `type: "user"` nested inside
    `job_config.ccr.events[0].data` next to `message`.
 
+   **Critical:** `update` REPLACES `job_config.ccr` wholesale. The
+   deep-copy above is what makes this safe — if you send a partial
+   `ccr` (e.g. only `environment_id`), the API drops `events` and the
+   prompt body is WIPED. Always send the COMPLETE `ccr`
+   (`environment_id` + `events` + `session_context`).
+
 5. Call `RemoteTrigger action=update trigger_id=<id>` with the
    resulting body.
 
-6. Verify: re-issue `RemoteTrigger action=get`. The content should
-   now equal the RENDERED BODY. If not, surface the discrepancy in
-   the report and stop — do not retry blindly.
+6. Verify: re-issue `RemoteTrigger action=get`. Confirm the returned
+   content equals RENDERED BODY (exact — sha or `diff`),
+   `environment_id` == `$ENVIRONMENT_ID`, and `autofix_on_pr_create`
+   == frontmatter `autofix`. If any check fails, surface it in the
+   report and stop — do not retry blindly.
 
 ## Step 6 — Report
 
