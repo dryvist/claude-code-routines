@@ -80,7 +80,7 @@ Also read the single pinned cloud environment id once per run — the
 repo, not the cloud UI, owns which environment each routine runs in:
 
 ```bash
-ENVIRONMENT_ID=$(grep -m1 '^ENVIRONMENT_ID=' routines/_common/deploy.config | cut -d= -f2)
+ENVIRONMENT_ID=$(grep -m1 '^ENVIRONMENT_ID=' routines/_common/deploy.config | cut -d= -f2 | tr -d '\r')
 ```
 
 Every create/update below sets `job_config.ccr.environment_id` to
@@ -182,7 +182,9 @@ substitute only the per-routine fields.**
    `job_config.ccr.environment_id`, and
    `job_config.ccr.session_context.autofix_on_pr_create`. Take the
    RENDERED BODY, `$ENVIRONMENT_ID`, and the frontmatter `autofix`
-   from Step 2.
+   from Step 2. Normalize both `autofix_on_pr_create` and frontmatter
+   `autofix` to `false` when absent or `null` before comparing — older
+   routines may lack the field and the API may omit falsey values.
 
 3. **In sync only if ALL THREE match**: CLOUD_BODY == RENDERED BODY,
    `environment_id` == `$ENVIRONMENT_ID`, and `autofix_on_pr_create`

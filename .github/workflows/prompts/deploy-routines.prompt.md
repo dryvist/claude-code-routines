@@ -26,7 +26,7 @@ For every file matching `routines/*.prompt.md` in this checkout:
 
    ```bash
    ENVIRONMENT_ID=$(grep -m1 '^ENVIRONMENT_ID=' \
-     routines/_common/deploy.config | cut -d= -f2)
+     routines/_common/deploy.config | cut -d= -f2 | tr -d '\r')
    ```
 
 2. **If the frontmatter has no `trigger_id` field**, distinguish two
@@ -46,8 +46,9 @@ For every file matching `routines/*.prompt.md` in this checkout:
    (`job_config.ccr.events[0].data.message.content`) vs BODY, the cloud
    `job_config.ccr.environment_id` vs `$ENVIRONMENT_ID`, and
    `job_config.ccr.session_context.autofix_on_pr_create` vs frontmatter
-   `autofix`. If ALL THREE match, print `SKIP <basename> (in sync)` and
-   move to the next file — do not call `update`.
+   `autofix` (treat absent/null on either side as `false`). If ALL THREE
+   match, print `SKIP <basename> (in sync)` and move to the next file —
+   do not call `update`.
 4. If any of the three differ, call `RemoteTrigger` with
    `action: update`, the file's `trigger_id`, and the COMPLETE `ccr`
    below. `update` REPLACES `job_config.ccr` wholesale — a partial
