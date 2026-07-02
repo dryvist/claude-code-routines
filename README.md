@@ -97,7 +97,7 @@ The result is cached after the first run —
 ```text
 GH_TOKEN=<fine-grained PAT, resource owner dryvist (see PAT scopes below)>
 GH_OWNER=<single owner/org for all routines, e.g. dryvist>
-STATE_REPO=<cross-run state repo, e.g. dryvist/routine-state (data branch)>
+STATE_REPO=<cross-run state repo, e.g. dryvist/routine-state>
 ```
 
 `gh` reads `GH_TOKEN` automatically. Every routine scopes
