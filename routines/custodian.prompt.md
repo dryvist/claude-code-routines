@@ -38,6 +38,12 @@ Routine-specific rules (stricter — these win):
 
 <!-- include: _common/prerequisites.md -->
 
+## Phase 0 — Connectivity preflight
+
+The paused check (`${ROUTINE_PAUSED}` → `🛑` and exit) runs first, per Hard Rules. Immediately after it, before any repo enumeration or GitHub I/O:
+
+<!-- include: _common/preflight.md -->
+
 ## Task Selection
 
 Use today's date (YYYY-MM-DD) as a seed. Convert to integer (remove dashes), mod by 100. Walk the cumulative weight table once to select 1 task.
@@ -53,6 +59,8 @@ Use today's date (YYYY-MM-DD) as a seed. Convert to integer (remove dashes), mod
 | 90-99 | bot-thread-resolve | Bot Review Thread Auto-Resolve |
 
 ## Task Definitions
+
+The `gh search issues` / `gh search prs` calls below are the primary data source for several tasks. On a Search-API HTTP 502 (the Search API flakes through the proxy), fall back to a per-repo `gh issue list` / `gh pr list` loop over the active-repo set.
 
 ### issue-triage
 
@@ -177,6 +185,7 @@ gh search prs --owner "$GH_OWNER" --state open --sort created --order desc --lim
 For each PR, fetch unresolved threads (skip if author is itself a bot in the whitelist — never resolve a bot's own threads against itself):
 
 ```bash
+# NOTE: requires GraphQL proxying enabled in the routine env; if it returns 403 "GraphQL proxying is not enabled", this path is unavailable — see PR notes.
 gh api graphql --raw-field 'query=query {
   repository(owner: "<OWNER>", name: "<REPO>") {
     pullRequest(number: <PR_NUMBER>) {

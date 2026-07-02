@@ -46,11 +46,11 @@ Routine-specific rules (The Conductor opens no PRs/issues and writes no files �
 
 <!-- include: _common/prerequisites.md -->
 
-## State gist — `conductor-state`
+## State file — `state/conductor.json`
 
-<!-- include: _common/state-gist.md -->
+<!-- include: _common/state-file.md -->
 
-Routine-specific fields (v2):
+Routine-specific fields (v2), stored in `state/conductor.json` and written back via the optimistic-lock `put_state` PUT from the state-file partial:
 
 ```json
 {
@@ -94,7 +94,7 @@ Dropped (never matched in sample): `chore(release):`, `chore: release`, `chore(g
 
 ### Title rejection: emoji and conventional-commit prefix (absorbs the prior `soul` rule for the bot-PR pipeline)
 
-Reject if title contains Unicode emoji (`\x{1F300}-\x{1FFFF}` or `[\x{2600}-\x{27BF}]`) — bot-generated titles should never contain emoji. Scope note: this covers `soul` ONLY for bot PRs Conductor sees; estate-wide enforcement on human commits is not provided here (baseline today is clean — zero violations in the 100-commit sample dated 2026-05-15 to 2026-05-25; file a Sentinel follow-up if the baseline degrades).
+Reject if title contains Unicode emoji (`\x{1F300}-\x{1FFFF}` or `[\x{2600}-\x{27BF}]`) — bot-generated titles should never contain emoji. Scope note: this covers `soul` ONLY for bot PRs Conductor sees; estate-wide enforcement on human commits is not provided here (baseline today is clean — zero violations in the 100-commit sample dated 2026-05-15 to 2026-05-25; file a follow-up issue if the baseline degrades).
 
 ## Workflow-edits exception
 
@@ -121,7 +121,7 @@ flake.lock
 VERSION
 ```
 
-Plus any per-repo additions from `release_allowlist_extensions[$repo]` in state gist (operator-managed).
+Plus any per-repo additions from `release_allowlist_extensions[$repo]` in `state/conductor.json` (operator-managed).
 
 ```bash
 FILES=$(gh api "repos/$GH_OWNER/$REPO/pulls/$PR_NUMBER/files" \
@@ -180,6 +180,12 @@ gh api "repos/$GH_OWNER/$REPO/commits/$HEAD_SHA/check-runs" \
   --jq '[.check_runs[] | select(.status=="completed") | .conclusion] | all(. == "success" or . == "skipped" or . == "neutral")'
 ```
 
+## Phase 0 — Connectivity preflight
+
+The paused check (`${ROUTINE_PAUSED}` → `🛑` and exit) runs first, per Hard Rules. Immediately after it, before any repo enumeration or state I/O:
+
+<!-- include: _common/preflight.md -->
+
 ## Phase 1 — Enumerate active repos
 
 ```bash
@@ -192,7 +198,7 @@ Apply the skip-list (mirrors, abandoned, profile/meta — same set as Distributo
 
 ## Phase 2 — Fetch bot PRs (one org-wide search, not per-repo)
 
-Use `gh search prs` to enumerate all open bot PRs in `$GH_OWNER` in a single call. Avoids the per-repo `gh pr list` loop (saves ~one API request per repo per run, ~100 calls/run at current estate size):
+Use `gh search prs` to enumerate all open bot PRs in `$GH_OWNER` in a single call. Avoids the per-repo `gh pr list` loop (saves ~one API request per repo per run, ~100 calls/run at current estate size). If this `gh search` returns HTTP 502 (the Search API flakes through the proxy), fall back to the per-repo `gh pr list --state open` loop it replaces:
 
 ```bash
 gh search prs --owner "$GH_OWNER" --state open --limit 200 \
