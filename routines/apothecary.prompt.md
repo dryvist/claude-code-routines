@@ -24,6 +24,7 @@ The prior version focused on Dependabot triage with a 10-lockfile pattern list. 
 ## Hard Rules (load-bearing)
 
 <!-- include: _common/hard-rules.md -->
+<!-- include: _common/preflight.md -->
 <!-- include: _common/redaction.md -->
 
 Routine-specific rules (stricter — these win):
@@ -42,11 +43,12 @@ Routine-specific rules (stricter — these win):
 <!-- include: _common/prerequisites.md -->
 
 Routine-specific prerequisites:
-- `GH_TOKEN` requires `security_events` scope.
 
-## State gist — `apothecary-state`
+- `GH_TOKEN` requires `security_events` scope (fine-grained: Code scanning + Secret scanning alerts: read).
 
-<!-- include: _common/state-gist.md -->
+## State file — `state/apothecary.json`
+
+<!-- include: _common/state-file.md -->
 
 Routine-specific fields (v2):
 
@@ -145,7 +147,7 @@ Alert age > 7 days. Filters transient findings.
 
 ### Gate 3 — CodeQL ignore list
 
-`rule.id` is NOT in `codeql_ignore[$repo]` (operator-curated list in state gist). If a rule has been historically determined to be a false positive for this repo, leave it alone.
+`rule.id` is NOT in `codeql_ignore[$repo]` (operator-curated list in the state file). If a rule has been historically determined to be a false positive for this repo, leave it alone.
 
 ### Gate 4 — File-list allowlist (subset, NOT exact-set)
 

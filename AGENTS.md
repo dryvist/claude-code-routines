@@ -20,18 +20,31 @@ registry for completeness but is not deployed via the cloud-routine path.
 
 ## Retired routines
 
-### Weekly Scorecard (retired 2026-05-30, trigger reused 2026-06-09)
+### Weekly Scorecard (retired 2026-05-30, reused 2026-06-09, fully retired 2026-07-01)
 
 - **trigger_id:** `trig_01TGiH3VuW5Xp7Ej9wSQFvpq`
 - **2026-05-30:** GitHub repo-health scoring merged into The Observer
-  (Monday code path). State migration: on The Observer's first run, the
-  legacy `weekly-scorecard-state` gist is read, scorecard data copied
-  into the new `observer-state` gist's `scorecard_history` field, then
-  the legacy gist deleted.
-- **2026-06-09:** The dormant trigger was reused for a new, disjoint
-  scope — Estate Consolidation 2026-06 Linear project reporting
-  (`routines/weekly-scorecard.prompt.md`). Repo-health scoring stays in
-  The Observer; the two Monday messages do not overlap.
+  (Monday code path). Repo-health scoring stays in The Observer.
+- **2026-06-09:** The dormant trigger was reused for a disjoint scope —
+  Estate Consolidation 2026-06 Linear project reporting.
+- **2026-07-01:** Fully retired. The Estate Consolidation project was
+  time-boxed (completion target 2026-07-12); the routine was Linear-only,
+  read-only, held no GitHub state, and was never affected by the gist
+  outage. Source file `routines/weekly-scorecard.prompt.md` removed;
+  **disable this trigger in the cloud** as part of the repo-file-state
+  deploy. Do not reuse the trigger again without a fresh decision.
+
+### The Sentinel (retired 2026-07-01)
+
+- **trigger_id:** `trig_012Qm47ALSKohLHapA1pD9t1`
+- **Replacement:** none. Retired as low-value: it opened one PR/day of
+  hardcoded-literal parameterization nits, and its *documented* role as
+  the `prompt_sha256` cross-check monitor (former hard rule 10) was never
+  actually implemented in the prompt. Source file
+  `routines/sentinel.prompt.md` removed; **disable this trigger in the
+  cloud** as part of the repo-file-state deploy. A real out-of-band
+  liveness monitor is deferred (see the fingerprint note in the state
+  rules below).
 
 ### The Distributor (retired 2026-05-30)
 
@@ -54,8 +67,9 @@ partials:
 
 | Partial | Carries |
 | --- | --- |
-| `hard-rules.md` | Pause check, no-local-git, committer recipe, redaction |
-| `state-gist.md` | Schema-v2 skeleton, fail-open, retention, fingerprint |
+| `hard-rules.md` | Pause + preflight gate, committer recipe, redaction |
+| `preflight.md` | Auth + REST-egress canaries; `🔴 FATAL` template |
+| `state-file.md` | Contents-API state I/O, SHA lock, retention, PR budget |
 | `attribution.md` | Title suffix, no-emoji, Provenance block, label |
 | `slack-output.md` | Mandatory message, `<`/`>` sanitization function |
 
@@ -65,7 +79,7 @@ A routine pulls a partial in with a marker line containing exactly:
 <!-- include: _common/<name>.md -->
 ```
 
-Routine-specific values (PR caps, gist names, schedules, divergences)
+Routine-specific values (PR caps, state-file names, schedules, divergences)
 stay in the routine file near the marker. Partials must not contain
 nested include markers.
 
@@ -145,8 +159,9 @@ When a single PR rewrites multiple routine prompts (e.g. PR #20),
 do NOT deploy all updates in one `RemoteTrigger update` burst.
 Stage by blast radius and watch each stage for 48 hours:
 
-1. **Stage 1 (Day 0)** — read-mostly routines (Inspector, Sentinel,
-   The Observer). Watch 48h.
+1. **Stage 1 (Day 0)** — read-mostly routines (The Observer first,
+   then Inspector). Watch 48h. The Observer is the canonical smoke
+   test for the state-file + preflight + personal-user-token stack.
 2. **Stage 2 (Day 2)** — label-only / config-only mutations
    (Apothecary, Quartermaster, Daily Polish). Watch 48h.
 3. **Stage 3 (Day 4)** — high-mutation routines (Archivist,
@@ -190,6 +205,15 @@ identity/auth/signing model in one place).
    This is the kill switch for a misbehaving routine — setting the
    env var on the claude.ai web UI takes effect on the next cron
    tick without a redeploy.
+5b. **Connectivity preflight (fail loud).** Immediately after the
+   paused check and before any GitHub enumeration or state I/O, every
+   routine runs the `preflight.md` canaries (auth + REST egress). On
+   failure it emits a distinct `🔴 <Routine> FATAL: <cause>` Slack
+   message and exits — it MUST NOT fall through to a "no findings ✓"
+   success. This exists because an invalid token or a blocked/`502`
+   egress otherwise yields empty enumeration that reads as a healthy
+   quiet estate. `🔴` = infra-fatal; `🛑` = paused. Empty results are
+   only ever reported after the preflight passes.
 6. **Body redaction before any commit/issue/PR composition.** Every
    string fetched from outside the routine (file bodies, PR titles,
    issue bodies, alert names, commit messages) and destined for
@@ -220,9 +244,12 @@ identity/auth/signing model in one place).
    echo "${untrusted_title}" | safe
    ```
 
-8. **State gist convention.** Each routine that holds cross-run
-   memory uses one private GitHub Gist named `<routine>-state`
-   (e.g. `archivist-state`). Schema:
+8. **State file convention.** Cloud routines cannot write gists (the
+   egress proxy blocks gist writes, HTTP 403). Each routine that holds
+   cross-run memory uses one private JSON file `state/<routine>.json`
+   in the repo named by `$STATE_REPO` (owned by the runtime-token
+   user), read/written through the Contents API with SHA optimistic
+   locking (see `_common/state-file.md`). Schema:
 
    ```json
    {
@@ -238,17 +265,18 @@ identity/auth/signing model in one place).
    ```
 
    Retention is per-field, not blanket: `run_log` trimmed to 90
-   days (archive overflow to sibling gist `<routine>-state-archive`),
+   days (archive overflow to sibling file `state/<routine>-archive.json`),
    `closed_pairs` and `apothecary-codeql-ignore` retained
    **indefinitely** (rejection memory must outlive trim windows),
-   cooldowns trim once expired. Hard cap 1 MB per gist. Never
+   cooldowns trim once expired. Hard cap ~1 MB per file. Never
    write secrets, raw alert payloads, full PR diffs, or repo file
-   contents to a state gist — `run_log.reason` is bounded to 200
+   contents to a state file — `run_log.reason` is bounded to 200
    chars after redaction (rule 6).
 
 9. **Per-repo PR budget.** PR-emitting routines (Inspector,
-   Quartermaster, Archivist Task 1) consult a shared
-   gist `routine-pr-budget` before opening a PR. Schema:
+   Quartermaster, Archivist Task 1) consult the shared file
+   `pr-budget.json` at the `$STATE_REPO` root before opening a PR.
+   Schema:
 
    ```json
    {
@@ -259,27 +287,33 @@ identity/auth/signing model in one place).
 
    Soft cap: **2 PRs per repo per UTC day across all routines**
    (Conductor merges don't count). Read the day's counter, skip
-   the repo if at cap, otherwise increment and proceed.
-   Concurrency posture is best-effort, not exactly-once — cron
-   stagger keeps near-misses rare. If the gist is missing,
-   corrupted, or returns non-JSON: fail open (proceed with the
-   routine's own per-run cap) AND emit a Slack warning.
+   the repo if at cap, otherwise increment and proceed (Contents API
+   SHA lock; retry once on 409). Concurrency posture is best-effort,
+   not exactly-once — cron stagger keeps near-misses rare. If the file
+   is missing, corrupted, or returns non-JSON: fail open (proceed with
+   the routine's own per-run cap) AND emit a Slack warning.
 
-10. **Prompt fingerprint logging.** Each run appends one
-    `prompt_sha256` entry to the state gist (overwrites the
-    previous entry — only the most-recent fingerprint is needed).
-    Sentinel cross-checks this against `sha256` of the prompt file
-    at HEAD of `main` in `dryvist/claude-code-routines`; a
-    mismatch indicates the cloud deployment is stale or has been
-    mutated out-of-band.
+10. **Prompt fingerprint (written, not consumed).** Each run
+    overwrites the state file's `prompt_sha256` with `sha256` of its
+    prompt body. NOTE: no routine currently reads this back — the
+    former "Sentinel cross-checks the fingerprint" mechanism was never
+    implemented and Sentinel is retired (2026-07-01). The field is kept
+    as a cheap breadcrumb for a future **out-of-band liveness/drift
+    monitor** (deferred; a GHA-scheduled App-token checker over the
+    `$STATE_REPO` files, independent of `GH_TOKEN`). Do not rely on it
+    for drift detection today, and do not claim any routine performs the
+    cross-check.
 
 11. **Single-owner scope.** Every routine operates on exactly one
     configured owner (`$GH_OWNER`, default `dryvist`). No routine
     enumerates a multi-owner list — do not reintroduce a `$GH_OWNERS`
     variable or a comma-split owner loop. The runtime `GH_TOKEN` PAT
-    MUST be scoped to that owner's repos only; that token scope is the
-    authoritative backstop, so a prompt slip or a misconfigured env var
-    can never reach a repo outside the configured owner.
+    (a `JacobPEvans-personal` user PAT) MUST be scoped to the `$GH_OWNER`
+    operational repos **plus the single `$STATE_REPO`** (the cross-run
+    state store, owned by the token user) — and nothing else. That token
+    scope is the authoritative backstop: a prompt slip or misconfigured
+    env var can never mutate a repo outside `$GH_OWNER`, and the only
+    non-`$GH_OWNER` write target is the dedicated state repo.
 
 ## Attribution conventions
 
@@ -287,10 +321,10 @@ Every PR or issue created by a cloud routine MUST be self-identifying.
 Three layers: title suffix → label → body Provenance block. The user
 can't tell which routine made a PR if any of these are missing.
 
-These rules apply to all PR-creating routines (Daily Polish, Sentinel,
+These rules apply to all PR-creating routines (Daily Polish,
 Inspector, Quartermaster, Archivist, Apothecary, The Solver) and all
 issue-creating routines (Custodian's repo-audit, Archivist's
-private-docs issue, Sentinel's secret alerts if filed).
+private-docs issue).
 
 ### Title
 
@@ -324,7 +358,7 @@ Every PR body and every issue body ends with this block:
 - **Triggered:** <what fired this run (cron + task selection if any)>
 - **Why this PR/issue:** <one-line rationale tying the selection
   algorithm to this specific output>
-- **State:** [<gist name>](<gist URL>)
+- **State:** `state/<basename>.json` in `$STATE_REPO`
 - **Label:** `cloud-routine`
 ```
 

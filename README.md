@@ -21,14 +21,12 @@ Canonical registry — one row per live trigger, sorted by cron time.
 | Routine                 | Cron (UTC)       | Purpose                         |
 | ----------------------- | ---------------- | ------------------------------- |
 | [Daily Polish][dp]      | `0 4 * * *`      | Deep-clean one repo per day     |
-| [The Sentinel][se]      | `33 5 * * *`     | Parameterization sweep + 1 PR   |
 | [The Inspector][in]     | `0 6 * * *`      | 3-rule audit → 1 PR or issue    |
 | [The Custodian][cu]     | `0 7 * * *`      | Weighted-random maintenance     |
 | [The Quartermaster][qm] | `0 8 * * *`      | pre-commit pin bumps (≤3 PRs)   |
 | [Docs Sync][ds]         | `13 8 * * 1`     | Weekly documentation PRs        |
 | [The Archivist][ar]     | `0 9 * * *`      | README quality / docs coverage  |
 | [The Observer][ob]      | `0 10 * * *`     | Daily briefing + Mon repo score |
-| [Weekly Scorecard][ws]  | `7 10 * * 1`     | Estate Consolidation report     |
 | [The Conductor][co]     | `15 11,17 * * *` | Bot-PR allowlist merges         |
 | [The Apothecary][ap]    | `0 13 * * *`     | Security alert triage + labels  |
 | [The Solver][is] (GHA)  | `0 0,12 * * *`   | Solve one task → 1 ready PR     |
@@ -38,22 +36,21 @@ The Solver runs as a GitHub Actions workflow
 prompt file has no `trigger_id`.
 
 [dp]: routines/daily-polish.prompt.md
-[se]: routines/sentinel.prompt.md
 [in]: routines/inspector.prompt.md
 [cu]: routines/custodian.prompt.md
 [qm]: routines/quartermaster.prompt.md
 [ds]: routines/docs-sync.prompt.md
 [ar]: routines/archivist.prompt.md
 [ob]: routines/observer.prompt.md
-[ws]: routines/weekly-scorecard.prompt.md
 [co]: routines/conductor.prompt.md
 [ap]: routines/apothecary.prompt.md
 [is]: routines/issue-solver.prompt.md
 
 Retired triggers (disabled in the cloud, no source file): Morning
 Briefing and the original Weekly Scorecard merged into The Observer;
-The Distributor replaced by org Required Workflows. See
-[AGENTS.md](AGENTS.md#retired-routines).
+the resurrected Weekly Scorecard (Estate Consolidation reporting) and
+The Sentinel retired 2026-07-01; The Distributor replaced by org
+Required Workflows. See [AGENTS.md](AGENTS.md#retired-routines).
 
 ## Architecture
 
@@ -98,17 +95,17 @@ The result is cached after the first run —
 ### Environment Variables
 
 ```text
-GH_TOKEN=<your GitHub PAT>
-GH_OWNER=<single owner/org for all routines>
-SENTINEL_OPERATOR_PATTERNS=<optional, comma-separated regex list>
+GH_TOKEN=<JacobPEvans-personal user PAT (see PAT scopes below)>
+GH_OWNER=<single owner/org for all routines, e.g. dryvist>
+STATE_REPO=<owner/repo for cross-run state, e.g. JacobPEvans-personal/routine-state>
 ```
 
 `gh` reads `GH_TOKEN` automatically. Every routine scopes
 its work to the singular `GH_OWNER` (one org/user) — no
-routine enumerates a multi-owner list.
-`SENTINEL_OPERATOR_PATTERNS` is an optional list of
-additional regexes The Sentinel flags as operator-specific
-findings (e.g. internal hostnames, project codenames).
+routine enumerates a multi-owner list. Cross-run state lives as
+JSON files in the private `STATE_REPO` (owned by the token's
+user), written via the Contents API — cloud routines cannot use
+gists (the egress proxy blocks gist writes).
 
 ### Routine registration (cloud-hosted routines only)
 
@@ -136,14 +133,21 @@ those values are secrets and live outside the repo.
 
 ### Required PAT Scopes
 
+The runtime token is a `JacobPEvans-personal` **user** PAT with write
+access to the `$GH_OWNER` repos the routines touch **and** to
+`$STATE_REPO`. Fine-grained is preferred (least privilege); the
+classic-scope equivalents are:
+
 | Scope         | Used By                                |
 | ------------- | -------------------------------------- |
-| `repo`        | All routines — read/write repo data    |
+| `repo`        | All routines — read/write repo + state |
 | `delete_repo` | Custodian — branch deletion via API    |
-| `gist`        | Polish, Solver, Scorecard, Sentinel    |
 | `workflow`    | Custodian — workflow run checks        |
 | `read:org`    | All routines — org-level search        |
-| `project`     | Morning Briefing — project queries     |
+| `project`     | Observer — Monday scorecard queries    |
+
+No `gist` scope: cloud routines cannot write gists (egress proxy
+blocks them); all state is in `$STATE_REPO` via the Contents API.
 
 ### MCP Connections
 
@@ -193,9 +197,9 @@ fallback, see [CLAUDE.md](CLAUDE.md).
 ### Prompt assembly (DRY partials)
 
 Routine files in `routines/` are the DRY source form. Shared
-boilerplate (hard rules, state-gist convention, attribution,
-Slack sanitization) lives in `routines/_common/` partials, pulled
-in by marker lines of the form
+boilerplate (hard rules, connectivity preflight, state-file
+convention, attribution, Slack sanitization) lives in
+`routines/_common/` partials, pulled in by marker lines of the form
 `<!-- include: _common/<name>.md -->`.
 
 The deployed prompt is always the **rendered** output of
@@ -238,9 +242,7 @@ claude-code-routines/
     ├── inspector.prompt.md
     ├── issue-solver.prompt.md
     ├── observer.prompt.md
-    ├── quartermaster.prompt.md
-    ├── sentinel.prompt.md
-    └── weekly-scorecard.prompt.md
+    └── quartermaster.prompt.md
 ```
 
 ## License

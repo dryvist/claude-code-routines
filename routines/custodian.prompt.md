@@ -38,6 +38,12 @@ Routine-specific rules (stricter — these win):
 
 <!-- include: _common/prerequisites.md -->
 
+## Phase 0 — Connectivity preflight
+
+The paused check (`${ROUTINE_PAUSED}` → `🛑` and exit) runs first, per Hard Rules. Immediately after it, before any repo enumeration or GitHub I/O:
+
+<!-- include: _common/preflight.md -->
+
 ## Task Selection
 
 Use today's date (YYYY-MM-DD) as a seed. Convert to integer (remove dashes), mod by 100. Walk the cumulative weight table once to select 1 task.
@@ -52,7 +58,25 @@ Use today's date (YYYY-MM-DD) as a seed. Convert to integer (remove dashes), mod
 | 82-89 | stale-pr | Stale PR Cleanup |
 | 90-99 | bot-thread-resolve | Bot Review Thread Auto-Resolve |
 
+**GraphQL gate for `bot-thread-resolve`.** This task is entirely GraphQL
+(`reviewThreads` + `resolveReviewThread`, which have no REST equivalent), and the
+cloud egress proxy currently blocks GraphQL (`403 "GraphQL proxying is not
+enabled"` — an Anthropic-side setting, not user-configurable as of 2026-07). If
+`bot-thread-resolve` is selected, first run a one-line canary:
+
+```bash
+gh api graphql -f query='{viewer{login}}' >/dev/null 2>&1 || GRAPHQL_DOWN=1
+```
+
+If `GRAPHQL_DOWN` is set, do NOT run this task and do NOT waste the run — re-select
+the next task down the table (wrapping to `issue-triage`), and add one line to the
+Slack output noting `bot-thread-resolve` was skipped (GraphQL unavailable in-cloud;
+reimplementation on the GitHub Actions path is the tracked follow-up). If the canary
+succeeds (the proxy was later enabled server-side), proceed normally.
+
 ## Task Definitions
+
+The `gh search issues` / `gh search prs` calls below are the primary data source for several tasks. On a Search-API HTTP 502 (the Search API flakes through the proxy), fall back to a per-repo `gh issue list` / `gh pr list` loop over the active-repo set.
 
 ### issue-triage
 
@@ -177,6 +201,7 @@ gh search prs --owner "$GH_OWNER" --state open --sort created --order desc --lim
 For each PR, fetch unresolved threads (skip if author is itself a bot in the whitelist — never resolve a bot's own threads against itself):
 
 ```bash
+# NOTE: GraphQL is blocked by the cloud egress proxy (403 "GraphQL proxying is not enabled") and is NOT user-configurable — the Task Selection GraphQL gate above already re-selects away from this task when the canary fails, so reaching this call means GraphQL is available.
 gh api graphql --raw-field 'query=query {
   repository(owner: "<OWNER>", name: "<REPO>") {
     pullRequest(number: <PR_NUMBER>) {
