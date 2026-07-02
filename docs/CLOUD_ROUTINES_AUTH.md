@@ -160,10 +160,15 @@ in this order — each layer is independent:
    infrastructure, not a repo/token fix — check the proxy policy at
    `/__agentproxy/status` and confirm `api.github.com` is permitted for the
    routine environment.
-3. **GraphQL ("GraphQL proxying is not enabled", HTTP 403).** Distinct from the
-   hard gist block — this reads as an *enable-able* proxy setting. Custodian uses
-   `gh api graphql`; enable GraphQL proxying in the routine env, or those specific
-   calls stay unavailable (the rest of the routine still runs).
+3. **GraphQL ("GraphQL proxying is not enabled", HTTP 403).** A property of the
+   Anthropic egress proxy, **not user-configurable** (as of 2026-07 — undocumented,
+   no env toggle; both `api.github.com` and `gist.github.com` are domain-allowlisted
+   yet GraphQL and gist *writes* are blocked at the operation level). Only Custodian's
+   `bot-thread-resolve` needs it (`resolveReviewThread` is GraphQL-only, no REST
+   equivalent). That task self-skips via a GraphQL canary and re-selects another
+   task, so nothing breaks; it auto-resumes if Anthropic enables GraphQL proxying
+   server-side. To run it sooner, reimplement it on the GitHub Actions path (like
+   The Solver — GHA runners have normal egress and GraphQL works there).
 4. **Gist writes ("not permitted through this proxy", HTTP 403).** Categorical and
    unfixable — this is *why* state moved to `$STATE_REPO`. If you see this, a
    routine is still attempting a gist write; it should be using the Contents API
