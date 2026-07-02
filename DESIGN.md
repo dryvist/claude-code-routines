@@ -249,6 +249,32 @@ added as part of this work (1C in the
 improvement plan) so both routines share the
 same "always emit something" discipline.
 
+## The Solver — Linear-only scope (July 1, 2026)
+
+The Solver's GitHub-Issue fallback (Phase 1b, gated on the
+`ai-ready` label) was removed. The Solver now works a single
+queue: **Linear (JAC team)**. If Linear yields no work, it
+exits — it no longer looks at GitHub issues.
+
+Why: the GitHub issue → PR path is owned by `dryvist/ai-workflows`.
+Its `cc-issue-resolver` resolves issues event-driven on the
+`ai:ready` label (applied by `issue-triage`, and by the new
+`issue-backlog-sweep` for pre-existing backlog). Keeping a second,
+cron-driven system that also pulled GitHub issues risked two
+systems opening rival PRs for the same issue — wasted tokens and
+merge conflicts. Splitting cleanly by source removes that race:
+
+- **GitHub issues → ai-workflows** (`cc-issue-resolver`, event-driven).
+- **Linear tasks → The Solver** (cron, this repo).
+
+Sections above that describe the Solver triaging GitHub issues
+(the April 25 addendum's `gh search issues` scoring pipeline,
+"state gist for fresh issues," twice-daily "catch issues opened
+overnight") are retained as design history but no longer reflect
+the routine — those mechanisms applied to the removed GH queue.
+The twice-daily cadence and Linear discovery/triage/implement
+pipeline remain.
+
 ## What's Not Here
 
 **The Groundskeeper** (Option 2) runs as a local
