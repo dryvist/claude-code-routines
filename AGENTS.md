@@ -247,9 +247,10 @@ identity/auth/signing model in one place).
 8. **State file convention.** Cloud routines cannot write gists (the
    egress proxy blocks gist writes, HTTP 403). Each routine that holds
    cross-run memory uses one private JSON file `state/<routine>.json`
-   in the repo named by `$STATE_REPO` (owned by the runtime-token
-   user), read/written through the Contents API with SHA optimistic
-   locking (see `_common/state-file.md`). Schema:
+   on the **`data` branch** of `$STATE_REPO` (a `$GH_OWNER` repo; state
+   uses `data` because the org ruleset makes `main` PR-only), read/written
+   through the Contents API with SHA optimistic locking (see
+   `_common/state-file.md`). Schema:
 
    ```json
    {
@@ -307,13 +308,12 @@ identity/auth/signing model in one place).
 11. **Single-owner scope.** Every routine operates on exactly one
     configured owner (`$GH_OWNER`, default `dryvist`). No routine
     enumerates a multi-owner list — do not reintroduce a `$GH_OWNERS`
-    variable or a comma-split owner loop. The runtime `GH_TOKEN` PAT
-    (a `JacobPEvans-personal` user PAT) MUST be scoped to the `$GH_OWNER`
-    operational repos **plus the single `$STATE_REPO`** (the cross-run
-    state store, owned by the token user) — and nothing else. That token
+    variable or a comma-split owner loop. The runtime `GH_TOKEN` (a
+    fine-grained PAT, resource owner `$GH_OWNER`) MUST be scoped to the
+    `$GH_OWNER` operational repos **plus `$STATE_REPO`** (the cross-run
+    state store, also under `$GH_OWNER`) — and nothing else. That token
     scope is the authoritative backstop: a prompt slip or misconfigured
-    env var can never mutate a repo outside `$GH_OWNER`, and the only
-    non-`$GH_OWNER` write target is the dedicated state repo.
+    env var can never mutate a repo outside `$GH_OWNER`.
 
 ## Attribution conventions
 

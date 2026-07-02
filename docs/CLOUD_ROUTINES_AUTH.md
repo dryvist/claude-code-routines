@@ -12,16 +12,18 @@ Operator runbook for getting a fork of this repo running against your own
 GitHub org. The routines themselves are written to be account-agnostic —
 all account-specific values come from routine env vars listed below.
 
-> **This deployment (dryvist), as of 2026-07-01:** the runtime identity is a
-> `JacobPEvans-personal` **user** PAT (not a GitHub App bot) with write access
-> to the `dryvist` (`$GH_OWNER`) operational repos **and** to the private state
-> repo `$STATE_REPO` (`JacobPEvans-personal/routine-state`). Commits therefore
-> attribute to that user via the Contents API `committer` object. State is JSON
-> files in `$STATE_REPO` (`state/<routine>.json` + `pr-budget.json`) — **cloud
-> routines cannot use gists**, the egress proxy blocks gist writes
-> (`"Gist writes are not permitted through this proxy"`, HTTP 403). The
-> account-agnostic App-bot runbook below still works for a fresh fork; the
-> App-vs-user-PAT choice only changes `author.login` on landed commits.
+> **This deployment (dryvist), as of 2026-07-02:** the runtime token is a
+> fine-grained PAT with **resource owner `dryvist` (`$GH_OWNER`)** and write
+> access to the operational repos **and** to the private state repo
+> `$STATE_REPO` (`dryvist/routine-state`). Commit identity comes from the
+> `GIT_COMMITTER_*` env via the Contents API `committer` object. State is JSON
+> files on the **`data` branch** of `$STATE_REPO` (`state/<routine>.json` +
+> `pr-budget.json`) — **not `main`**: the org ruleset makes `main` PR-only, and
+> the `data` branch only requires verified signatures (which the Contents API's
+> web-flow signing provides). **Cloud routines cannot use gists** — the egress
+> proxy blocks gist writes (`"Gist writes are not permitted through this
+> proxy"`, HTTP 403). The account-agnostic App-bot runbook below still works for
+> a fresh fork; the App-vs-PAT choice only changes `author.login` on commits.
 
 ## Architecture summary
 
@@ -78,9 +80,10 @@ routines:
 - `GH_OWNER` — the org or user that owns the target repos
   (e.g. `acme-corp`).
 - `STATE_REPO` — `owner/repo` of the private cross-run state store
-  (e.g. `JacobPEvans-personal/routine-state`). Create it as an empty private
-  repo owned by the token's user before first run; routines create
-  `state/<routine>.json` and `pr-budget.json` on demand via the Contents API.
+  (e.g. `dryvist/routine-state`). Before first run, create it as a private repo
+  under `$GH_OWNER` **and create a `data` branch** — routines write state to
+  `data` (the org ruleset makes `main` PR-only). Routines create
+  `state/<routine>.json` and `pr-budget.json` on `data` on demand.
 - `GIT_AUTHOR_NAME` — `<your-app-slug>[bot]` (matches what GitHub
   renders for App-attributed commits).
 - `GIT_AUTHOR_EMAIL` — the App's no-reply form, lowercase slug:
@@ -151,7 +154,7 @@ in this order — each layer is independent:
 
 1. **Token (HTTP 401 / "Bad credentials").** The PAT is invalid, expired, or was
    never re-pasted after a rotation. Verify with `gh api user` (does it return
-   the expected `JacobPEvans-personal` login?). Fix via the Annual PAT rotation
+   the token owner's expected login?). Fix via the Annual PAT rotation
    above — mint, re-paste `GH_TOKEN` at <https://claude.ai/code/routines>, verify.
    Note: a FATAL that *names* the token can be a misdiagnosis of a proxy 403/502
    — always confirm with `gh api user` before assuming expiry.
