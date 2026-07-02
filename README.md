@@ -95,17 +95,18 @@ The result is cached after the first run —
 ### Environment Variables
 
 ```text
-GH_TOKEN=<JacobPEvans-personal user PAT (see PAT scopes below)>
+GH_TOKEN=<fine-grained PAT, resource owner dryvist (see PAT scopes below)>
 GH_OWNER=<single owner/org for all routines, e.g. dryvist>
-STATE_REPO=<owner/repo for cross-run state, e.g. JacobPEvans-personal/routine-state>
+STATE_REPO=<cross-run state repo, e.g. dryvist/routine-state>
 ```
 
 `gh` reads `GH_TOKEN` automatically. Every routine scopes
 its work to the singular `GH_OWNER` (one org/user) — no
 routine enumerates a multi-owner list. Cross-run state lives as
-JSON files in the private `STATE_REPO` (owned by the token's
-user), written via the Contents API — cloud routines cannot use
-gists (the egress proxy blocks gist writes).
+JSON files on the `data` branch of the private `STATE_REPO`
+(under `dryvist`), written via the Contents API — cloud routines
+cannot use gists (the egress proxy blocks gist writes), and the
+org ruleset makes `main` PR-only so state uses `data`.
 
 ### Routine registration (cloud-hosted routines only)
 
@@ -133,10 +134,10 @@ those values are secrets and live outside the repo.
 
 ### Required PAT Scopes
 
-The runtime token is a `JacobPEvans-personal` **user** PAT with write
-access to the `$GH_OWNER` repos the routines touch **and** to
-`$STATE_REPO`. Fine-grained is preferred (least privilege); the
-classic-scope equivalents are:
+The runtime token is a fine-grained PAT with **resource owner
+`$GH_OWNER` (`dryvist`)** and write access to the operational repos
+the routines touch **and** to `$STATE_REPO`. The classic-scope
+equivalents are:
 
 | Scope         | Used By                                |
 | ------------- | -------------------------------------- |

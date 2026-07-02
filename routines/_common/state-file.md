@@ -1,10 +1,13 @@
 Cross-run memory lives as one **JSON file per routine** in the private repo
-`$STATE_REPO` (owned by the runtime-token user), at `state/<routine>.json`. The
-shared PR budget is `pr-budget.json` at the repo root. **Gists are NOT used** —
-the cloud egress proxy blocks gist writes (`"Gist writes are not permitted
-through this proxy"`, HTTP 403). All state I/O goes through the GitHub Contents
-API, the same signed-commit path used for every other file write. Standard
-schema skeleton (v2):
+`$STATE_REPO` (in the `$GH_OWNER` org), on the **`data` branch**, at
+`state/<routine>.json`. The shared PR budget is `pr-budget.json` at the root of
+the same branch. **Gists are NOT used** — the cloud egress proxy blocks gist
+writes (`"Gist writes are not permitted through this proxy"`, HTTP 403). **State
+lives on `data`, not `main`,** because the org ruleset makes `main` require a
+pull request for every change — impossible for per-run writes; the `data` branch
+only requires verified signatures, which the Contents API's web-flow signing
+already provides. All state I/O goes through the GitHub Contents API against
+`data`. Standard schema skeleton (v2):
 
 ```json
 {
@@ -25,7 +28,7 @@ fields.
 
 ```bash
 STATE_PATH="state/<routine>.json"
-if gh api "repos/$STATE_REPO/contents/$STATE_PATH" >/tmp/sr.json 2>/tmp/sr.err; then
+if gh api "repos/$STATE_REPO/contents/$STATE_PATH?ref=data" >/tmp/sr.json 2>/tmp/sr.err; then
   STATE_SHA=$(jq -r '.sha' /tmp/sr.json)
   STATE=$(jq -r '.content' /tmp/sr.json | base64 -d)
 elif grep -qiE '404|not found' /tmp/sr.err; then
@@ -42,7 +45,7 @@ fi
 put_state() {  # $1 = full new state JSON
   jq -n \
     --arg content "$(printf '%s' "$1" | base64 -w0)" \
-    --arg branch  "main" \
+    --arg branch  "data" \
     --arg cname   "$GIT_COMMITTER_NAME" \
     --arg cemail  "$GIT_COMMITTER_EMAIL" \
     --arg msg     "chore(state): <routine> run" \
