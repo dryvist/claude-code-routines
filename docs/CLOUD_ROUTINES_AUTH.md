@@ -48,8 +48,8 @@ all account-specific values come from routine env vars listed below.
 
 - Contents: Read and write
 - Pull requests: Read and write
-- Issues: Read and write (Custodian needs this for label edits and
-  the repo-audit issue it creates)
+- Issues: Read and write (estate-janitor needs this for label edits
+  and the repo-health audit issue it creates)
 - Metadata: Read-only
 
 Install on either your personal account or your org. Note the numeric
@@ -71,7 +71,7 @@ to rotate annually.
 
 ### 3. Set the routine env
 
-At <https://claude.ai/code/routines>, on the env shared by all five
+At <https://claude.ai/code/routines>, on the env shared by all cloud
 routines:
 
 - `GH_TOKEN` — the runtime PAT from step 2. Must also have write access to
@@ -100,7 +100,7 @@ just create one test commit and read the resulting `author.email`.
 
 ### 4. Verify
 
-Trigger any routine (Daily Polish is cheapest) and inspect the resulting
+Trigger any routine (docs-polish is cheapest) and inspect the resulting
 PR's commits:
 
 ```bash
@@ -166,12 +166,13 @@ in this order — each layer is independent:
 3. **GraphQL ("GraphQL proxying is not enabled", HTTP 403).** A property of the
    Anthropic egress proxy, **not user-configurable** (as of 2026-07 — undocumented,
    no env toggle; both `api.github.com` and `gist.github.com` are domain-allowlisted
-   yet GraphQL and gist *writes* are blocked at the operation level). Only Custodian's
-   `bot-thread-resolve` needs it (`resolveReviewThread` is GraphQL-only, no REST
-   equivalent). That task self-skips via a GraphQL canary and re-selects another
-   task, so nothing breaks; it auto-resumes if Anthropic enables GraphQL proxying
-   server-side. To run it sooner, reimplement it on the GitHub Actions path (like
-   The Solver — GHA runners have normal egress and GraphQL works there).
+   yet GraphQL and gist *writes* are blocked at the operation level). **No cloud
+   routine uses GraphQL anymore** — the Custodian's `bot-thread-resolve` task was
+   dropped in the 2026-07 consolidation for exactly this reason; its replacement
+   is the deterministic review-thread-janitor workflow in `dryvist/ai-workflows`
+   (GHA runners have normal egress, GraphQL works there — same reason
+   issue-solver and routine-monitor live in GHA). If a cloud routine hits this
+   error, a GraphQL call crept back into a prompt; remove it.
 4. **Gist writes ("not permitted through this proxy", HTTP 403).** Categorical and
    unfixable — this is *why* state moved to `$STATE_REPO`. If you see this, a
    routine is still attempting a gist write; it should be using the Contents API
@@ -180,6 +181,15 @@ in this order — each layer is independent:
    but couldn't read/write its `state/<routine>.json` (repo missing, or a transient
    error). Confirm `$STATE_REPO` exists and the token can write it. Memory is
    degraded for that run only; it is never a substitute for a FATAL.
+6. **Cloud GitHub connection ("not enabled for this session", HTTP 403 on every
+   repo call).** The cloud sandbox's GitHub access rides a proxy-scoped credential
+   from the claude.ai ACCOUNT's GitHub connection, not `GH_TOKEN` alone. A GitHub
+   account/org rename invalidates it — every repo API call 403s regardless of
+   token validity (observed after the 2026-06 account rename). Fix: re-run
+   `/web-setup` on claude.ai to re-bind the GitHub connection, then smoke-test
+   below. No prompt or env change helps until that is done.
 
-After a fix, re-run The Observer first (cheapest read-only smoke test) and confirm
-it writes `state/observer.json` in `$STATE_REPO` before releasing the rest.
+After a fix, re-run estate-briefing first (cheapest read-only smoke test) and
+confirm it writes `state/estate-briefing.json` in `$STATE_REPO` before releasing
+the rest. The daily `routine-monitor.yml` workflow will independently flag any
+routine whose state stops updating.

@@ -86,8 +86,12 @@ soft cap (2 PRs per repo per UTC day across all routines); otherwise increment a
 write back (same optimistic-lock PUT). If `pr-budget.json` is missing or corrupt:
 fail open (proceed with this routine's own per-run cap) AND emit a Slack warning.
 
-**Prompt fingerprint (written, not consumed).** Each run overwrites
-`prompt_sha256` with `sha256` of this prompt body. No routine currently reads it
-back — the historical "Sentinel cross-checks the fingerprint" mechanism was never
-implemented and Sentinel is retired. It is kept as a cheap breadcrumb for a future
-out-of-band monitor; do not rely on it for drift detection today.
+**Prompt fingerprint (consumed by the monitor).** Each run overwrites
+`prompt_sha256` with the SHA-256 of this prompt body. A scheduled GitHub Actions
+workflow (`routine-monitor.yml` in the routines repo) compares it daily against
+the rendered repo source and also checks that this state file is still being
+written (liveness). Compute it exactly like this so both sides hash the same
+bytes: use the Write tool to save the prompt body you received — everything in
+this message, verbatim, byte-for-byte, ending with a single trailing newline —
+to `/tmp/prompt-body.md`, then run `sha256sum /tmp/prompt-body.md` and store the
+hex digest in `prompt_sha256` every run.

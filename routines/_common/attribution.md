@@ -15,7 +15,7 @@ Every PR or issue this routine creates MUST be self-identifying. Three layers �
   - **Label:** `cloud-routine`
   ```
 
-- **Label:** apply `cloud-routine` after creation. The label is propagated to every public repo by `JacobPEvans/.github` label-sync — never `gh label create` per repo. If a label-add fails because the target repo is private and outside the sync list, log a Slack warning and proceed.
+- **Label:** apply `cloud-routine` after creation. The label is propagated to every public repo by `dryvist/.github` label-sync — never `gh label create` per repo. If a label-add fails because the target repo is private and outside the sync list, log a Slack warning and proceed.
 
   ```bash
   gh pr edit "$PR_NUMBER" --repo "$GH_OWNER/<repo>" --add-label cloud-routine

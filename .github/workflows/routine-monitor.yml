@@ -1,0 +1,131 @@
+# Routine monitor — the out-of-band drift + liveness checker.
+#
+# Every cloud routine writes `prompt_sha256` (SHA-256 of the prompt body it
+# received, single trailing newline) into its state file on
+# dryvist/routine-state@data each run. This workflow is the consumer:
+#
+#   LIVENESS — a routine's state file is missing, or its last write is older
+#     than the routine's threshold (3 days; docs-sync 9 — weekly cadence).
+#     A dead routine writes nothing; preflight-FATAL loops also show up here.
+#   DRIFT   — (cloud routines only) the state file's prompt_sha256 differs
+#     from the SHA-256 of the rendered repo prompt's body (everything after
+#     the rendered frontmatter). Expected drift: a routine PR merged but the
+#     manual RemoteTrigger deploy hasn't happened yet — that is the designed
+#     "you forgot to deploy" signal.
+#
+# Hash calibration: the routine-side recipe (routines/_common/state-file.md)
+# and the awk extraction below must hash identical bytes. If the first live
+# comparison mismatches on every routine, adjust the extraction (leading blank
+# line / trailing newline) until one known-good routine matches, and update
+# this header. If drift stays incorrigibly noisy after two weeks, drop the sha
+# comparison and keep liveness only.
+#
+# issue-solver is GHA-managed (prompt is repo-native, drift impossible) —
+# liveness only.
+#
+# Findings land on ONE tracking issue: "[routine-monitor] drift/liveness
+# findings" — created when findings appear, commented on while they persist,
+# closed on a clean run.
+name: Routine monitor
+
+on:
+  schedule:
+    - cron: '30 20 * * *' # after the last cloud cron of the day (17:15 UTC)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: routine-monitor
+  cancel-in-progress: false
+
+env:
+  STATE_REPO: dryvist/routine-state
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Mint dryvist-claude installation token (routine-state read)
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.GH_APP_CLAUDE_BOT_ID }}
+          private-key: ${{ secrets.GH_APP_CLAUDE_BOT_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: routine-state
+
+      - name: Render all prompts
+        run: scripts/render-all-routines.sh /tmp/rendered
+
+      - name: Check drift and liveness
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          : > /tmp/findings.md
+          NOW=$(date -u +%s)
+          for f in /tmp/rendered/*.prompt.md; do
+            NAME=$(basename "$f" .prompt.md)
+            SRC="routines/$NAME.prompt.md"
+            THRESHOLD_DAYS=3
+            [ "$NAME" = "docs-sync" ] && THRESHOLD_DAYS=9
+            IS_CLOUD=0
+            grep -q '^trigger_id:' "$SRC" && IS_CLOUD=1
+
+            STATE_PATH="state/$NAME.json"
+            if ! RESP=$(gh api "repos/$STATE_REPO/contents/$STATE_PATH?ref=data" 2>/dev/null); then
+              echo "- **MISSING** \`$NAME\`: no \`$STATE_PATH\` on \`$STATE_REPO@data\` (routine never ran, state write failing, or App not installed on routine-state)" >> /tmp/findings.md
+              continue
+            fi
+
+            LAST_WRITE=$(gh api "repos/$STATE_REPO/commits?path=$STATE_PATH&sha=data&per_page=1" \
+              --jq '.[0].commit.committer.date // empty')
+            if [ -n "$LAST_WRITE" ]; then
+              AGE_DAYS=$(( (NOW - $(date -u -d "$LAST_WRITE" +%s)) / 86400 ))
+              if [ "$AGE_DAYS" -gt "$THRESHOLD_DAYS" ]; then
+                echo "- **STALE** \`$NAME\`: state last written $AGE_DAYS days ago (threshold ${THRESHOLD_DAYS}d) — routine dead or FATAL-looping" >> /tmp/findings.md
+              fi
+            fi
+
+            if [ "$IS_CLOUD" = "1" ]; then
+              REPORTED_SHA=$(echo "$RESP" | jq -r '.content' | base64 -d | jq -r '.prompt_sha256 // empty')
+              RENDERED_SHA=$(awk 'f; /^---$/{c++; if(c==2) f=1}' "$f" | sha256sum | cut -d' ' -f1)
+              if [ -n "$REPORTED_SHA" ] && [ "$REPORTED_SHA" != "$RENDERED_SHA" ]; then
+                echo "- **DRIFT** \`$NAME\`: deployed prompt sha \`${REPORTED_SHA:0:12}…\` != rendered repo sha \`${RENDERED_SHA:0:12}…\` — deploy the routine (or calibrate the hash, see workflow header)" >> /tmp/findings.md
+              fi
+            fi
+          done
+          echo "findings:"; cat /tmp/findings.md
+
+      - name: Open, update, or close the tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TITLE="[routine-monitor] drift/liveness findings"
+          N=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "\"[routine-monitor]\" in:title" --json number --jq '.[0].number // empty')
+          if [ -s /tmp/findings.md ]; then
+            {
+              echo "Routine monitor findings for $(date -u +%F):"
+              echo
+              cat /tmp/findings.md
+              echo
+              echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            } > /tmp/issue-body.md
+            if [ -z "$N" ]; then
+              gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" \
+                --body-file /tmp/issue-body.md
+            else
+              gh issue comment "$N" --repo "$GITHUB_REPOSITORY" --body-file /tmp/issue-body.md
+            fi
+          elif [ -n "$N" ]; then
+            gh issue close "$N" --repo "$GITHUB_REPOSITORY" \
+              --comment "Clean run $(date -u +%F) — all routines live, no drift."
+          fi

@@ -13,12 +13,61 @@ do not duplicate it here. Every live cloud trigger MUST map to one
 its YAML frontmatter — or be disabled. `trigger_id`s are pinned; never
 change them. A new value means a new cloud routine, not an update.
 
-`The Solver` (file basename `issue-solver`, cron `0 0,12 * * *`) runs as
-a GitHub Actions workflow (`.github/workflows/issue-solver.yml`), not as
-a cloud routine — no `trigger_id` in its frontmatter. It's listed in the
-registry for completeness but is not deployed via the cloud-routine path.
+`issue-solver` (cron `0 0,12 * * *`) runs as a GitHub Actions workflow
+(`.github/workflows/issue-solver.yml`), not as a cloud routine — no
+`trigger_id` in its frontmatter. It's listed in the registry for
+completeness but is not deployed via the cloud-routine path.
+
+## Naming convention (2026-07 consolidation)
+
+One functional kebab-case token per routine, used identically everywhere:
+frontmatter `name`, file basename, attribution tag `[routine:<name>]`,
+state file `state/<name>.json`, Slack header, and branch prefix. No
+display names, no personas — the old "The Observer"-style names created
+three-token drift (display vs basename vs tag). Rename ledger (trigger_ids
+stay pinned across renames):
+
+- `estate-briefing` ← The Observer
+  (`trig_01TUW8LMXob53okTF8juhkA8`)
+- `repo-audit` ← The Inspector
+  (`trig_01Kaa2rWoVFS4HN4LRR5UMWX`)
+- `estate-janitor` ← The Custodian
+  (`trig_01PQsM64nMfQRYptyihRr3Er`)
+- `precommit-bump` ← The Quartermaster
+  (`trig_017wzm9n7a8v2yh3tfAsnmg8`)
+- `bot-pr-merge` ← The Conductor, absorbing The Apothecary
+  (`trig_01N7W9LBApg9veyo2NgdprNV`)
+- `docs-polish` ← Daily Polish, absorbing the Archivist readme task
+  (`trig_01V6C6j9FHn21pk11YfrjURH`)
+- `docs-sync` ← Docs Sync, name normalized
+  (`trig_01J9F82aQp1NX5W8PcvSXyh6`)
+- `issue-solver` ← The Solver, name normalized (GHA — no trigger)
+- The Apothecary's own trigger `trig_015zNd6NJRJZCd784qX5FEgm` and the
+  Archivist's `trig_01U6EPmvAdUDy2k7LfYWkqts`: DISABLED, never reuse.
 
 ## Retired routines
+
+### The Apothecary (merged 2026-07-02)
+
+- **trigger_id:** `trig_015zNd6NJRJZCd784qX5FEgm` — disabled, never reuse.
+- **Replacement:** Phase A of `bot-pr-merge` (security triage runs
+  immediately before the merge pass, twice daily). Rationale: Apothecary's
+  `auto-merge-deps` labels were inert until Conductor ran; one routine
+  removes the coupling.
+
+### The Archivist (merged 2026-07-02)
+
+- **trigger_id:** `trig_01U6EPmvAdUDy2k7LfYWkqts` — disabled, never reuse.
+- **Replacement:** the `readme-quality` task merged into `docs-polish`
+  (estate-wide 8-check scoring); the `mintlify-coverage` task demoted to a
+  read-only Monday scorecard line in `estate-briefing` (closes the issue
+  #24 evaluation — the issue-filing path never proved its hit rate).
+
+### Legacy Issue Solver cloud trigger (disabled 2026-07-02)
+
+- **trigger_id:** `trig_01W4LiFv6S6uAf53UoBKrhsX` — disabled, never reuse.
+- The Solver moved to GitHub Actions (`issue-solver.yml`) long before, but
+  the old cloud trigger was still enabled and shadowing the GHA run.
 
 ### Weekly Scorecard (retired 2026-05-30, reused 2026-06-09, fully retired 2026-07-01)
 
@@ -41,10 +90,10 @@ registry for completeness but is not deployed via the cloud-routine path.
   hardcoded-literal parameterization nits, and its *documented* role as
   the `prompt_sha256` cross-check monitor (former hard rule 10) was never
   actually implemented in the prompt. Source file
-  `routines/sentinel.prompt.md` removed; **disable this trigger in the
-  cloud** as part of the repo-file-state deploy. A real out-of-band
-  liveness monitor is deferred (see the fingerprint note in the state
-  rules below).
+  `routines/sentinel.prompt.md` removed; trigger disabled in the cloud
+  2026-07-02 (it had kept firing after retirement — the gap that
+  motivated the monitor). The real out-of-band liveness/drift monitor
+  now exists: `.github/workflows/routine-monitor.yml` (hard rule 11).
 
 ### The Distributor (retired 2026-05-30)
 
@@ -69,9 +118,13 @@ partials:
 | --- | --- |
 | `hard-rules.md` | Pause + preflight gate, committer recipe, redaction |
 | `preflight.md` | Auth + REST-egress canaries; `🔴 FATAL` template |
-| `state-file.md` | Contents-API state I/O, SHA lock, retention, PR budget |
+| `state-file.md` | State I/O, SHA lock, retention, budget, fingerprint |
+| `state-migrate.md` | One-run state-path migration (remove ~2026-07-20) |
 | `attribution.md` | Title suffix, no-emoji, Provenance block, label |
 | `slack-output.md` | Mandatory message, `<`/`>` sanitization function |
+| `redaction.md` | Canonical redaction regex set |
+| `prerequisites.md` | Required env vars + tools |
+| `skip-list.md` | Repos no routine scans |
 
 A routine pulls a partial in with a marker line containing exactly:
 
@@ -92,9 +145,10 @@ renders every prompt on each PR and uploads the rendered blobs as an
 artifact. Editing a partial changes the rendered body of every routine
 that includes it — redeploy all affected routines.
 
-`issue-solver.prompt.md` includes no partials: it runs in GitHub
-Actions with App-token commit attribution and intentionally diverges
-on committer, attribution, and output conventions.
+`issue-solver.prompt.md` includes only the `prerequisites.md` partial:
+it runs in GitHub Actions with App-token commit attribution and
+intentionally diverges on committer, attribution, and output
+conventions.
 
 The "Hard rules" and "Attribution conventions" sections below remain
 the operator-facing description; the prompt-body encoding of those
@@ -155,21 +209,34 @@ these files is keeping cloud and repo in lockstep.
 
 ### Staggered deploy after multi-routine merges
 
-When a single PR rewrites multiple routine prompts (e.g. PR #20),
-do NOT deploy all updates in one `RemoteTrigger update` burst.
-Stage by blast radius and watch each stage for 48 hours:
+When a single PR rewrites multiple routine prompts, do NOT deploy all
+updates in one blind `RemoteTrigger update` burst. Order by blast
+radius, smoke-test each deploy, and pair merge-away disables with their
+absorbing routine's update:
 
-1. **Stage 1 (Day 0)** — read-mostly routines (The Observer first,
-   then Inspector). Watch 48h. The Observer is the canonical smoke
-   test for the state-file + preflight + personal-user-token stack.
-2. **Stage 2 (Day 2)** — label-only / config-only mutations
-   (Apothecary, Quartermaster, Daily Polish). Watch 48h.
-3. **Stage 3 (Day 4)** — high-mutation routines (Archivist,
-   Conductor, Custodian, The Solver). Watch 48h.
+1. **Read-mostly first** — `estate-briefing` (the canonical smoke test
+   for the state-file + preflight + token stack), then `repo-audit`.
+   `RemoteTrigger action=run` once and confirm a sane Slack message and
+   a state-file write before proceeding.
+2. **Config/docs mutations** — `precommit-bump`, `docs-sync`,
+   `docs-polish`.
+3. **High-mutation last** — `estate-janitor`, then `bot-pr-merge`
+   (it merges PRs — watch its first run live: labels ≤5, merges gated).
 
-If a stage produces unexpected PRs/issues/merges, halt subsequent
-stages, set `ROUTINE_PAUSED=true` on the misbehaving routine via
-the claude.ai web UI, and fix forward.
+Rules that always apply:
+
+- **Save a rollback body.** Before every `update`, save the full
+  `RemoteTrigger get` response; any stage can then be reverted verbatim.
+- **Pause lever is per-trigger `enabled: false`** —
+  `RemoteTrigger action=update trigger_id=<id> body={"enabled": false}`,
+  verify with `get`. `ROUTINE_PAUSED` is an env var on the SINGLE shared
+  cloud environment: setting it pauses EVERY routine, not one. Use it
+  only as the estate-wide kill switch.
+- **Merges pair disable-then-update.** When routine B absorbed routine
+  A, disable A's trigger and update B's in the same sitting — the
+  coverage gap is minutes, dual-coverage never happens.
+- If a deploy misbehaves: `enabled: false` that trigger, restore the
+  saved body, fix forward.
 
 ## Hard rules for routine prompts
 
@@ -201,20 +268,22 @@ identity/auth/signing model in one place).
    session link, there isn't one.
 5. **Paused flag.** Every routine checks `${ROUTINE_PAUSED}` at the
    top of its main task. If set (any non-empty value), emit a
-   single Slack message `🛑 <Routine> paused via env` and exit.
-   This is the kill switch for a misbehaving routine — setting the
-   env var on the claude.ai web UI takes effect on the next cron
-   tick without a redeploy.
-5b. **Connectivity preflight (fail loud).** Immediately after the
+   single Slack message `🛑 <routine> paused via env` and exit.
+   NOTE: the env var lives on the single shared cloud environment, so
+   setting it pauses EVERY routine — it is the estate-wide kill
+   switch. The per-routine pause lever is the trigger's top-level
+   `enabled: false` (see the deploy runbook). Both take effect on the
+   next cron tick without a redeploy.
+6. **Connectivity preflight (fail loud).** Immediately after the
    paused check and before any GitHub enumeration or state I/O, every
    routine runs the `preflight.md` canaries (auth + REST egress). On
-   failure it emits a distinct `🔴 <Routine> FATAL: <cause>` Slack
+   failure it emits a distinct `🔴 <routine> FATAL: <cause>` Slack
    message and exits — it MUST NOT fall through to a "no findings ✓"
    success. This exists because an invalid token or a blocked/`502`
    egress otherwise yields empty enumeration that reads as a healthy
    quiet estate. `🔴` = infra-fatal; `🛑` = paused. Empty results are
    only ever reported after the preflight passes.
-6. **Body redaction before any commit/issue/PR composition.** Every
+7. **Body redaction before any commit/issue/PR composition.** Every
    string fetched from outside the routine (file bodies, PR titles,
    issue bodies, alert names, commit messages) and destined for
    GitHub or Slack MUST pass through the redaction regex set
@@ -233,7 +302,7 @@ identity/auth/signing model in one place).
    `.envrc.local`, `CLAUDE.local.md`. A redacted match in a
    Provenance "Why" line MUST describe the rule that fired, not
    quote the offending string.
-7. **Slack output sanitization.** Slack's `<!channel>`, `<!here>`,
+8. **Slack output sanitization.** Slack's `<!channel>`, `<!here>`,
    `<@USERID>`, `<#CHANNEL>`, `<URL|text>` tokens can be smuggled
    through PR titles, issue bodies, alert names. Every Slack-emit
    path MUST escape `<` → `‹` and `>` → `›` in any field derived
@@ -244,13 +313,14 @@ identity/auth/signing model in one place).
    echo "${untrusted_title}" | safe
    ```
 
-8. **State file convention.** Cloud routines cannot write gists (the
+9. **State file convention.** Cloud routines cannot write gists (the
    egress proxy blocks gist writes, HTTP 403). Each routine that holds
    cross-run memory uses one private JSON file `state/<routine>.json`
    on the **`data` branch** of `$STATE_REPO` (a `$GH_OWNER` repo; state
    uses `data` because the org ruleset makes `main` PR-only), read/written
    through the Contents API with SHA optimistic locking (see
-   `_common/state-file.md`). Schema:
+   `_common/state-file.md`). This includes the GHA-managed
+   `issue-solver` (its 2026-07 migration retired the last gist). Schema:
 
    ```json
    {
@@ -267,45 +337,45 @@ identity/auth/signing model in one place).
 
    Retention is per-field, not blanket: `run_log` trimmed to 90
    days (archive overflow to sibling file `state/<routine>-archive.json`),
-   `closed_pairs` and `apothecary-codeql-ignore` retained
+   `closed_pairs` and `codeql_ignore` retained
    **indefinitely** (rejection memory must outlive trim windows),
    cooldowns trim once expired. Hard cap ~1 MB per file. Never
    write secrets, raw alert payloads, full PR diffs, or repo file
    contents to a state file — `run_log.reason` is bounded to 200
-   chars after redaction (rule 6).
+   chars after redaction (rule 7).
 
-9. **Per-repo PR budget.** PR-emitting routines (Inspector,
-   Quartermaster, Archivist Task 1) consult the shared file
-   `pr-budget.json` at the `$STATE_REPO` root before opening a PR.
-   Schema:
+10. **Per-repo PR budget.** PR-emitting routines (repo-audit,
+    precommit-bump, docs-polish) consult the shared file
+    `pr-budget.json` at the `$STATE_REPO` root before opening a PR.
+    Schema:
 
-   ```json
-   {
-     "2026-05-25": {"dryvist/nix-darwin": 1,
-                    "dryvist/ai-workflows": 2}
-   }
-   ```
+    ```json
+    {
+      "2026-05-25": {"dryvist/nix-darwin": 1,
+                     "dryvist/ai-workflows": 2}
+    }
+    ```
 
-   Soft cap: **2 PRs per repo per UTC day across all routines**
-   (Conductor merges don't count). Read the day's counter, skip
-   the repo if at cap, otherwise increment and proceed (Contents API
-   SHA lock; retry once on 409). Concurrency posture is best-effort,
-   not exactly-once — cron stagger keeps near-misses rare. If the file
-   is missing, corrupted, or returns non-JSON: fail open (proceed with
-   the routine's own per-run cap) AND emit a Slack warning.
+    Soft cap: **2 PRs per repo per UTC day across all routines**
+    (bot-pr-merge merges don't count). Read the day's counter, skip
+    the repo if at cap, otherwise increment and proceed (Contents API
+    SHA lock; retry once on 409). Concurrency posture is best-effort,
+    not exactly-once — cron stagger keeps near-misses rare. If the file
+    is missing, corrupted, or returns non-JSON: fail open (proceed with
+    the routine's own per-run cap) AND emit a Slack warning.
 
-10. **Prompt fingerprint (written, not consumed).** Each run
-    overwrites the state file's `prompt_sha256` with `sha256` of its
-    prompt body. NOTE: no routine currently reads this back — the
-    former "Sentinel cross-checks the fingerprint" mechanism was never
-    implemented and Sentinel is retired (2026-07-01). The field is kept
-    as a cheap breadcrumb for a future **out-of-band liveness/drift
-    monitor** (deferred; a GHA-scheduled App-token checker over the
-    `$STATE_REPO` files, independent of `GH_TOKEN`). Do not rely on it
-    for drift detection today, and do not claim any routine performs the
-    cross-check.
+11. **Prompt fingerprint (written AND consumed).** Each run overwrites
+    the state file's `prompt_sha256` with the SHA-256 of the prompt
+    body it received (exact recipe in `_common/state-file.md`). The
+    consumer is `.github/workflows/routine-monitor.yml` — a daily
+    GHA-scheduled checker (App token, independent of `GH_TOKEN`) that
+    compares each state file's fingerprint against the rendered repo
+    prompt (drift) and checks the state file's last-write age
+    (liveness), maintaining a single tracking issue in this repo.
+    A DRIFT finding right after a routine PR merges is the designed
+    "you forgot to deploy" signal.
 
-11. **Single-owner scope.** Every routine operates on exactly one
+12. **Single-owner scope.** Every routine operates on exactly one
     configured owner (`$GH_OWNER`, default `dryvist`). No routine
     enumerates a multi-owner list — do not reintroduce a `$GH_OWNERS`
     variable or a comma-split owner loop. The runtime `GH_TOKEN` (a
@@ -321,10 +391,10 @@ Every PR or issue created by a cloud routine MUST be self-identifying.
 Three layers: title suffix → label → body Provenance block. The user
 can't tell which routine made a PR if any of these are missing.
 
-These rules apply to all PR-creating routines (Daily Polish,
-Inspector, Quartermaster, Archivist, Apothecary, The Solver) and all
-issue-creating routines (Custodian's repo-audit, Archivist's
-private-docs issue).
+These rules apply to all PR-creating routines (docs-polish, repo-audit,
+precommit-bump, docs-sync, issue-solver) and all issue-creating
+routines (estate-janitor's repo-health audit, repo-audit's
+secrets-policy issue).
 
 ### Title
 
@@ -332,8 +402,9 @@ private-docs issue).
 <conventional-prefix>(<scope>): <description> [routine:<basename>]
 ```
 
-`<basename>` matches the routine file basename (`daily-polish`,
-`issue-solver`, etc.). Title must NOT contain emoji
+`<basename>` matches the routine file basename (`docs-polish`,
+`issue-solver`, etc. — identical to the routine's `name` under the
+naming convention above). Title must NOT contain emoji
 (soul rule: no emoji in commit messages, PR titles, PR descriptions,
 or release notes). Conventional-commit prefix is preserved so
 release-please continues to parse it.
@@ -388,7 +459,7 @@ Per-run, dated, namespaced:
 <type>/<routine-basename>/<slug>-<YYYY-MM-DD>
 ```
 
-Examples: `docs/daily-polish/int_homelab-2026-05-23`. Avoid
+Examples: `docs/docs-polish/int_homelab-2026-07-02`. Avoid
 collisions across runs by always including the date in the branch
 name.
 
@@ -398,13 +469,15 @@ name.
 the `ai-workflows` review workflows (`claude-review`,
 `final-pr-review`, `ai-merge-gate`) pick them up immediately.
 Routines never auto-merge; merges go through the normal review flow
-or `The Conductor`'s strict bot-author allowlist (which routine bots
+or `bot-pr-merge`'s strict bot-author allowlist (which routine bots
 are NOT a member of).
 
-**Exception** — PRs that modify `.github/workflows/*.yml` MUST pass
-`--draft`. Inspector's `no-scripts` rule (extracts inline workflow
-logic into `scripts/`) does this. Draft forces explicit human
-ready-flip before any auto-review fires; broken YAML never lands.
+**Exceptions** — PRs that modify `.github/workflows/*.yml` MUST pass
+`--draft`. repo-audit's `no-scripts` rule (extracts inline workflow
+logic into `.github/scripts/*.js`) does this. Draft forces explicit
+human ready-flip before any auto-review fires; broken YAML never
+lands. docs-sync PRs are also always draft (weekly cadence; a human
+flips ready when content warrants review).
 
 ## Out of scope for this repo
 
