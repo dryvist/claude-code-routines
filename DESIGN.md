@@ -284,3 +284,57 @@ tasks that require filesystem access. It is not
 included in this repo because it runs locally and
 its prompt lives in the local schedule
 configuration.
+
+## The Consolidation (July 2026)
+
+One session (2026-07-02) executed the largest reshape since the
+original build-out. Four moves, one theme: fewer, better-named,
+monitored routines.
+
+**Functional names everywhere.** The persona names ("The Observer",
+"The Solver") had drifted into three-token identity: display name,
+file basename, and attribution tag disagreed (The Solver's PRs were
+tagged `[routine:solver]` while its file was `issue-solver` — a filter
+on the documented convention missed every PR). The fix was structural,
+not cosmetic: ONE kebab-case token per routine, used identically as
+frontmatter `name`, basename, `[routine:<name>]` tag, state file, and
+Slack header. trigger_ids stayed pinned; the rename ledger lives in
+AGENTS.md.
+
+**Hard consolidation, 10 → 8.** Daily Polish and the Archivist's
+`readme-quality` task both fixed READMEs on different selection
+algorithms — merged into `docs-polish` (estate-wide 8-check scoring,
+worst repo first). The Apothecary's `auto-merge-deps` labels were
+inert until the Conductor happened to run — merged into `bot-pr-merge`
+(triage phase, then merge phase, twice daily). The Archivist's
+`mintlify-coverage` task was demoted to a read-only Monday line in
+`estate-briefing` (the issue-filing path never proved its hit rate).
+The Custodian's `bot-thread-resolve` task was deleted outright: it
+was GraphQL-only and the cloud proxy permanently blocks GraphQL — a
+tenth of that routine's runs re-rolled the lottery for nothing. Its
+replacement is a deterministic GHA workflow in `ai-workflows`, where
+GraphQL works.
+
+**The Solver's gist finally died.** Every other routine moved to
+`$STATE_REPO` when the proxy blocked gist writes; the Solver kept its
+gist because GHA runners could still write it. Consistency won:
+`state/issue-solver.json` on the `data` branch, written with the App
+installation token (no committer object — the App self-attributes and
+web-flow signs).
+
+**The monitor exists now.** Since the original Sentinel retirement,
+every routine wrote `prompt_sha256` that nothing read — and the
+retired Sentinel and Weekly Scorecard triggers were discovered STILL
+FIRING weeks after "retirement," which is exactly the failure class a
+monitor catches. `routine-monitor.yml` (GHA, daily, App token,
+independent of `GH_TOKEN`) now checks every state file for liveness
+(last-write age) and every cloud routine for drift (fingerprint vs
+rendered repo prompt), maintaining a single tracking issue. A DRIFT
+finding right after a merge is the designed "you forgot to deploy"
+nag — the deploy path is still manual RemoteTrigger, and forgetting
+it used to be silent.
+
+Deploy lesson encoded in the runbook rewrite: the per-trigger pause
+lever is `enabled: false` (verified to exist on the trigger object);
+`ROUTINE_PAUSED` rides the single shared environment and pauses
+EVERYTHING — it is the estate kill switch, not a scalpel.

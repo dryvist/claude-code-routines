@@ -18,44 +18,51 @@ design decisions, and lessons learned.
 Canonical registry — one row per live trigger, sorted by cron time.
 `trigger_id`s are pinned in each file's YAML frontmatter.
 
-| Routine                 | Cron (UTC)       | Purpose                         |
-| ----------------------- | ---------------- | ------------------------------- |
-| [Daily Polish][dp]      | `0 4 * * *`      | Deep-clean one repo per day     |
-| [The Inspector][in]     | `0 6 * * *`      | 3-rule audit → 1 PR or issue    |
-| [The Custodian][cu]     | `0 7 * * *`      | Weighted-random maintenance     |
-| [The Quartermaster][qm] | `0 8 * * *`      | pre-commit pin bumps (≤3 PRs)   |
-| [Docs Sync][ds]         | `13 8 * * 1`     | Weekly documentation PRs        |
-| [The Archivist][ar]     | `0 9 * * *`      | README quality / docs coverage  |
-| [The Observer][ob]      | `0 10 * * *`     | Daily briefing + Mon repo score |
-| [The Conductor][co]     | `15 11,17 * * *` | Bot-PR allowlist merges         |
-| [The Apothecary][ap]    | `0 13 * * *`     | Security alert triage + labels  |
-| [The Solver][is] (GHA)  | `0 0,12 * * *`   | Solve one task → 1 ready PR     |
+| Routine                  | Cron (UTC)       | Purpose                        |
+| ------------------------ | ---------------- | ------------------------------ |
+| [docs-polish][dp]        | `0 4 * * *`      | Fix worst-scoring repo's docs  |
+| [repo-audit][ra]         | `0 6 * * *`      | 3-rule audit → 1 PR or issue   |
+| [estate-janitor][ej]     | `0 7 * * *`      | Weighted-random maintenance    |
+| [precommit-bump][pb]     | `0 8 * * *`      | pre-commit pin bumps (≤3 PRs)  |
+| [docs-sync][ds]          | `13 8 * * 1`     | Weekly documentation PRs (0–2) |
+| [estate-briefing][eb]    | `0 10 * * *`     | Daily brief + Mon scorecard    |
+| [bot-pr-merge][bm]       | `15 11,17 * * *` | Security triage + bot merges   |
+| [issue-solver][is] (GHA) | `0 0,12 * * *`   | Solve one Linear task → 1 PR   |
 
-The Solver runs as a GitHub Actions workflow
+Names are functional kebab-case tokens used identically as file
+basename, attribution tag, state file, and Slack header — see the
+naming convention and rename ledger in
+[AGENTS.md](AGENTS.md#naming-convention-2026-07-consolidation).
+
+issue-solver runs as a GitHub Actions workflow
 (`.github/workflows/issue-solver.yml`), not a cloud routine — its
 prompt file has no `trigger_id`.
 
-[dp]: routines/daily-polish.prompt.md
-[in]: routines/inspector.prompt.md
-[cu]: routines/custodian.prompt.md
-[qm]: routines/quartermaster.prompt.md
+[dp]: routines/docs-polish.prompt.md
+[ra]: routines/repo-audit.prompt.md
+[ej]: routines/estate-janitor.prompt.md
+[pb]: routines/precommit-bump.prompt.md
 [ds]: routines/docs-sync.prompt.md
-[ar]: routines/archivist.prompt.md
-[ob]: routines/observer.prompt.md
-[co]: routines/conductor.prompt.md
-[ap]: routines/apothecary.prompt.md
+[eb]: routines/estate-briefing.prompt.md
+[bm]: routines/bot-pr-merge.prompt.md
 [is]: routines/issue-solver.prompt.md
 
-Retired triggers (disabled in the cloud, no source file): Morning
-Briefing and the original Weekly Scorecard merged into The Observer;
-the resurrected Weekly Scorecard (Estate Consolidation reporting) and
-The Sentinel retired 2026-07-01; The Distributor replaced by org
-Required Workflows. See [AGENTS.md](AGENTS.md#retired-routines).
+Retired/merged triggers (disabled in the cloud, no source file):
+The Apothecary merged into bot-pr-merge and The Archivist into
+docs-polish/estate-briefing (2026-07-02); Morning Briefing and the
+original Weekly Scorecard merged into estate-briefing; the resurrected
+Weekly Scorecard and The Sentinel retired 2026-07-01; The Distributor
+replaced by org Required Workflows. See
+[AGENTS.md](AGENTS.md#retired-routines).
 
 ## Architecture
 
 All cloud routines share a single Claude Code cloud
-environment and post results to Slack via MCP.
+environment and post results to Slack via MCP. A scheduled GHA
+monitor ([`routine-monitor.yml`](.github/workflows/routine-monitor.yml))
+cross-checks each routine's `prompt_sha256` fingerprint and
+state-file freshness daily, maintaining a single drift/liveness
+tracking issue in this repo.
 
 ```text
 ┌─────────────┐   ┌────────────────┐   ┌───────┐
@@ -139,13 +146,14 @@ The runtime token is a fine-grained PAT with **resource owner
 the routines touch **and** to `$STATE_REPO`. The classic-scope
 equivalents are:
 
-| Scope         | Used By                                |
-| ------------- | -------------------------------------- |
-| `repo`        | All routines — read/write repo + state |
-| `delete_repo` | Custodian — branch deletion via API    |
-| `workflow`    | Custodian — workflow run checks        |
-| `read:org`    | All routines — org-level search        |
-| `project`     | Observer — Monday scorecard queries    |
+| Scope             | Used By                                     |
+| ----------------- | ------------------------------------------- |
+| `repo`            | All routines — read/write repo + state      |
+| `delete_repo`     | estate-janitor — branch deletion via API    |
+| `workflow`        | estate-janitor — workflow run checks        |
+| `read:org`        | All routines — org-level search             |
+| `project`         | estate-briefing — Monday scorecard queries  |
+| `security_events` | bot-pr-merge — CodeQL/Dependabot alert read |
 
 No `gist` scope: cloud routines cannot write gists (egress proxy
 blocks them); all state is in `$STATE_REPO` via the Contents API.
@@ -163,7 +171,7 @@ Once the shared cloud environment is configured, the routines run
 themselves — no manual invocation. Each trigger fires on its cron
 schedule (see the [Routines](#routines) table), scopes its work to
 the single `$GH_OWNER`, performs its task against the GitHub API, and
-posts a summary to Slack. The Solver runs on its own GitHub Actions
+posts a summary to Slack. issue-solver runs on its own GitHub Actions
 schedule instead of a cloud trigger.
 
 To change behaviour, edit the relevant `routines/*.prompt.md` file and
@@ -229,21 +237,20 @@ claude-code-routines/
 │   ├── CODEOWNERS
 │   └── workflows/
 │       ├── deploy-routines.yml        # disabled (see header)
-│       ├── issue-solver.yml           # The Solver (GHA)
+│       ├── issue-solver.yml           # issue-solver (GHA)
+│       ├── routine-monitor.yml        # drift + liveness monitor
 │       └── prompts/
 │           └── deploy-routines.prompt.md
 └── routines/
     ├── .markdownlint.yaml
-    ├── apothecary.prompt.md
-    ├── archivist.prompt.md
-    ├── conductor.prompt.md
-    ├── custodian.prompt.md
-    ├── daily-polish.prompt.md
+    ├── bot-pr-merge.prompt.md
+    ├── docs-polish.prompt.md
     ├── docs-sync.prompt.md
-    ├── inspector.prompt.md
+    ├── estate-briefing.prompt.md
+    ├── estate-janitor.prompt.md
     ├── issue-solver.prompt.md
-    ├── observer.prompt.md
-    └── quartermaster.prompt.md
+    ├── precommit-bump.prompt.md
+    └── repo-audit.prompt.md
 ```
 
 ## License

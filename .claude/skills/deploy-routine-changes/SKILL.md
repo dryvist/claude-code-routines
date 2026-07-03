@@ -113,7 +113,7 @@ other top-level fields that are easy to drop. The reliable path:
 substitute only the per-routine fields.**
 
 1. Pick any sibling file with a `trigger_id` (e.g.
-   `routines/daily-polish.prompt.md`). Call:
+   `routines/docs-polish.prompt.md`). Call:
 
    ```text
    RemoteTrigger action=get trigger_id=<sibling-trigger-id>
@@ -163,8 +163,8 @@ substitute only the per-routine fields.**
 
    *Why local git here rather than the Contents API?* The Hard
    Rules in `CLAUDE.md` about Contents-API-only commits apply to
-   the **cloud-routine sandbox** (where there is no signing
-   identity — see `agentsmd/rules/git-signing.md`). This skill runs
+   the **cloud-routine sandbox**, where there is no signing
+   identity. This skill runs
    in an **interactive Claude Code session on the user's Mac**,
    which has GPG signing configured via nix-home. Local commits
    from this context are signed and pass `required_signatures`
@@ -206,6 +206,11 @@ substitute only the per-routine fields.**
    - `job_config.ccr.environment_id` ← `$ENVIRONMENT_ID`
    - top-level `cron_expression` ← frontmatter `cron`
 
+   If the frontmatter `name` differs from the trigger's top-level
+   `name` (a rename), also substitute:
+
+   - top-level `name` ← frontmatter `name`
+
    Preserve everything else verbatim — same rule as Step 4,
    including the `type: "user"` nested inside
    `job_config.ccr.events[0].data` next to `message`.
@@ -225,6 +230,23 @@ substitute only the per-routine fields.**
    == frontmatter `autofix`. If any check fails, surface it in the
    report and stop — do not retry blindly.
 
+## Step 5b — Disabling a retired or merged-away trigger
+
+When a routine is retired or merged into another, its trigger is
+DISABLED — never deleted (trigger_ids stay in the AGENTS.md ledger)
+and never reused. The trigger object has a top-level `enabled`
+boolean, and `update` is a partial update at the TOP level (partial
+`job_config.ccr` is what wipes bodies — top-level partials are safe):
+
+```text
+RemoteTrigger action=update trigger_id=<id> body={"enabled": false}
+RemoteTrigger action=get trigger_id=<id>     # verify enabled == false
+```
+
+Pair a merge-away disable with the absorbing routine's update in the
+same sitting so the coverage gap is minutes. `enabled: false` is also
+the per-routine pause/rollback lever during staged deploys.
+
 ## Step 6 — Report
 
 At the end of the session, emit a one-line-per-file summary so the
@@ -232,11 +254,12 @@ user can confirm the cloud is in sync:
 
 ```text
 Cloud routine sync:
-  SKIP   issue-solver         (no trigger_id — managed by GHA)
-  UPDATED sentinel            (placeholder → real body)
-  SKIP   daily-polish         (in sync)
+  SKIP    issue-solver        (no trigger_id — managed by GHA)
+  UPDATED estate-briefing     (body + name)
+  SKIP    docs-polish         (in sync)
+  DISABLED <old-name>         (merged into <new-name>)
   CREATED <new-name>          (trigger_id=<id>, PR #<n> opened)
-  FAIL   <name>               (<reason>)
+  FAIL    <name>              (<reason>)
 ```
 
 ## Hard rules
@@ -263,6 +286,12 @@ Cloud routine sync:
   killed the GHA workflow. If your session's `RemoteTrigger` hits
   it too, the harness's auth has changed; surface to the user and
   stop. Don't loop.
+- Deployed routines FATAL with `403 "not enabled for this session"`
+  on every GitHub call — the claude.ai account's GitHub connection is
+  stale (e.g. after an account/org rename). The USER must re-run
+  `/web-setup` on claude.ai; no prompt or env change helps. Deploying
+  is still safe (the body update is Anthropic-side), but smoke runs
+  will fail until the connection is re-bound.
 - API rejects create with a missing-required-field error — you
   dropped something from the canonical shape. Re-fetch a sibling's
   get response and audit your substitution.
