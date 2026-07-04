@@ -3,7 +3,6 @@ name: docs-polish
 trigger_id: trig_01V6C6j9FHn21pk11YfrjURH
 cron: "0 4 * * *"
 cron_human: Daily at 4:00 UTC (11:00 PM CT)
-model: claude-sonnet-5
 autofix: true
 allowed_tools:
   - Bash

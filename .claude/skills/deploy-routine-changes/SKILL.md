@@ -69,7 +69,7 @@ the first two `---` lines. Extract:
 - `name`
 - `trigger_id` (may be absent)
 - `cron` (may be absent)
-- `model`
+- `model` (may be absent → use `$MODEL` default from `deploy.config`)
 - `allowed_tools`
 - `autofix` (may be absent → treat as `false`)
 
@@ -81,11 +81,14 @@ repo, not the cloud UI, owns which environment each routine runs in:
 
 ```bash
 ENVIRONMENT_ID=$(grep -m1 '^ENVIRONMENT_ID=' routines/_common/deploy.config | cut -d= -f2 | tr -d '\r')
+MODEL=$(grep -m1 '^CLAUDE_SONNET_MODEL_ID=' routines/_common/deploy.config | cut -d= -f2 | tr -d '\r')
 ```
 
 Every create/update below sets `job_config.ccr.environment_id` to
 `$ENVIRONMENT_ID`. The environment's secrets (`GH_OWNER`, `GH_TOKEN`)
 live only in the cloud — this pins WHICH environment, not what's in it.
+`$MODEL` is the default routine model: a file's frontmatter `model`
+wins if present, otherwise use `$MODEL`.
 
 Note: editing a partial in `routines/_common/` changes the rendered
 body of EVERY routine that includes it. If a `_common/*.md` file was
@@ -130,6 +133,7 @@ substitute only the per-routine fields.**
    - `job_config.ccr.session_context.allowed_tools` ← frontmatter
      `allowed_tools`
    - `job_config.ccr.session_context.model` ← frontmatter `model`
+     if present, else `$MODEL` from `routines/_common/deploy.config`
    - `job_config.ccr.session_context.autofix_on_pr_create` ←
      frontmatter `autofix` (absent → `false`)
    - `job_config.ccr.environment_id` ← `$ENVIRONMENT_ID` from
@@ -201,6 +205,7 @@ substitute only the per-routine fields.**
    - `job_config.ccr.session_context.allowed_tools` ← frontmatter
      `allowed_tools`
    - `job_config.ccr.session_context.model` ← frontmatter `model`
+     if present, else `$MODEL` from `routines/_common/deploy.config`
    - `job_config.ccr.session_context.autofix_on_pr_create` ←
      frontmatter `autofix` (absent → `false`)
    - `job_config.ccr.environment_id` ← `$ENVIRONMENT_ID`

@@ -29,6 +29,16 @@ jobs:
           private-key: ${{ secrets.GH_APP_CLAUDE_BOT_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
 
+      # Single source of truth for the model id: routines/_common/deploy.config
+      # (CLAUDE_SONNET_MODEL_ID). Fail loud early if it's missing rather than
+      # passing an empty --model to the expensive run step.
+      - name: Resolve model id
+        id: model
+        run: |
+          id=$(grep -m1 '^CLAUDE_SONNET_MODEL_ID=' routines/_common/deploy.config | cut -d= -f2 | tr -d '\r')
+          [ -n "$id" ] || { echo "CLAUDE_SONNET_MODEL_ID not found in routines/_common/deploy.config"; exit 1; }
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+
       - name: Run issue-solver
         uses: anthropics/claude-code-action@769e3bdff9bb7ecfb51bad4c9cba23d6f5fc5ea5 # v1.0.163
         env:
@@ -62,4 +72,4 @@ jobs:
           claude_args: >-
             --allowedTools "Read,Edit,Write,Glob,Grep,WebFetch,Task,Bash(gh search:*),Bash(gh issue:*),Bash(gh pr:*),Bash(gh run:*),Bash(gh repo view:*),Bash(gh label:*),Bash(gh api repos/*:*),Bash(gh api graphql:*),Bash(curl -sS -X POST https://api.linear.app/graphql:*),Bash(jq:*),Bash(date:*),Bash(grep:*),Bash(base64:*),Bash(tr:*)"
             --max-turns 80
-            --model claude-sonnet-5
+            --model ${{ steps.model.outputs.id }}

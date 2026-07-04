@@ -3,7 +3,6 @@ name: precommit-bump
 trigger_id: trig_017wzm9n7a8v2yh3tfAsnmg8
 cron: "0 8 * * *"
 cron_human: Daily at 8:00 UTC (3:00 AM CT)
-model: claude-sonnet-5
 autofix: true
 allowed_tools:
   - Bash

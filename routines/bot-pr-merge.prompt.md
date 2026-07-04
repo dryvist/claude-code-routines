@@ -3,7 +3,6 @@ name: bot-pr-merge
 trigger_id: trig_01N7W9LBApg9veyo2NgdprNV
 cron: "15 11,17 * * *"
 cron_human: Daily at 11:15 and 17:15 UTC (6:15 AM and 12:15 PM CT)
-model: claude-sonnet-5
 allowed_tools:
   - Bash
   - Read

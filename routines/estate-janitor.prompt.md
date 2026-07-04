@@ -3,7 +3,6 @@ name: estate-janitor
 trigger_id: trig_01PQsM64nMfQRYptyihRr3Er
 cron: "0 7 * * *"
 cron_human: Daily at 7:00 UTC (2:00 AM CT)
-model: claude-sonnet-5
 allowed_tools:
   - Bash
   - Read
