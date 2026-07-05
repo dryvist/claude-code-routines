@@ -1,6 +1,5 @@
 ---
 name: issue-solver
-model: claude-sonnet-5
 allowed_tools:
   - Read
   - Write

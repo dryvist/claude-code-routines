@@ -19,13 +19,18 @@ Instructions for Claude when invoked by `.github/workflows/deploy-routines.yml`.
 For every file matching `routines/*.prompt.md` in this checkout:
 
 1. Read the file. Parse the YAML frontmatter for `trigger_id`, `cron`,
-   `model`, `allowed_tools`, and `autofix` (absent → `false`). Extract
-   the body below the closing `---` of the frontmatter — call it BODY.
-   Read the pinned cloud environment id once, and set
-   `job_config.ccr.environment_id` to it on every create/update:
+   `model` (may be absent → use `$MODEL` default), `allowed_tools`, and
+   `autofix` (absent → `false`). Extract the body below the closing
+   `---` of the frontmatter — call it BODY. Read the pinned cloud
+   environment id and default model once, and set
+   `job_config.ccr.environment_id` and
+   `job_config.ccr.session_context.model` accordingly on every
+   create/update:
 
    ```bash
    ENVIRONMENT_ID=$(grep -m1 '^ENVIRONMENT_ID=' \
+     routines/_common/deploy.config | cut -d= -f2 | tr -d '\r')
+   MODEL=$(grep -m1 '^CLAUDE_SONNET_MODEL_ID=' \
      routines/_common/deploy.config | cut -d= -f2 | tr -d '\r')
    ```
 
@@ -71,7 +76,7 @@ For every file matching `routines/*.prompt.md` in this checkout:
          }],
          "session_context": {
            "allowed_tools": "<from frontmatter>",
-           "model": "<from frontmatter>",
+           "model": "<frontmatter model, or $MODEL default>",
            "autofix_on_pr_create": <frontmatter autofix, default false>
          }
        }
@@ -105,7 +110,7 @@ A) Fetch the canonical request shape from an existing cloud routine
    `cron_expression`, the frontmatter field is `cron`);
    `job_config.ccr.session_context.allowed_tools` ← frontmatter
    `allowed_tools`; `job_config.ccr.session_context.model` ←
-   frontmatter `model`;
+   frontmatter `model` if present, else `$MODEL`;
    `job_config.ccr.session_context.autofix_on_pr_create` ← frontmatter
    `autofix` (absent → `false`); `job_config.ccr.environment_id` ←
    `$ENVIRONMENT_ID`; `job_config.ccr.events[0].data.message.content`

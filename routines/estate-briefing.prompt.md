@@ -3,7 +3,6 @@ name: estate-briefing
 trigger_id: trig_01TUW8LMXob53okTF8juhkA8
 cron: "0 10 * * *"
 cron_human: Daily at 10:00 UTC (5:00 AM CT)
-model: claude-sonnet-5
 allowed_tools:
   - Bash
   - Read
