@@ -61,6 +61,7 @@ jobs:
           private-key: ${{ secrets.GH_APP_CLAUDE_BOT_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: routine-state
+          permission-contents: read
 
       - name: Render all prompts
         run: scripts/render-all-routines.sh /tmp/rendered
