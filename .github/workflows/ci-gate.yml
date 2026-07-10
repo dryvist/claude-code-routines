@@ -34,9 +34,6 @@ jobs:
     with:
       markdown_lint: true
       file_size: true
-      # Staged: pre-existing workflow-security findings tracked in #66;
-      # enable once resolved.
-      zizmor: false
       filters: |
         markdown:
           - '**.md'
