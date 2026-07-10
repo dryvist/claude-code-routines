@@ -27,7 +27,16 @@ jobs:
         with:
           app-id: ${{ vars.GH_APP_CLAUDE_BOT_ID }}
           private-key: ${{ secrets.GH_APP_CLAUDE_BOT_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
+          # owner (org-wide) is required: issue-solver opens PRs and runs
+          # createCommitOnBranch against whichever dryvist target repo a Linear
+          # task maps to — the target set is not statically enumerable, so
+          # `repositories:` cannot replace it. Permissions are scoped to what
+          # the run actually uses.
+          owner: ${{ github.repository_owner }} # zizmor: ignore[github-app]
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
+          permission-actions: read
 
       # Single source of truth for the model id: routines/_common/deploy.config
       # (CLAUDE_SONNET_MODEL_ID). Fail loud early if it's missing rather than
