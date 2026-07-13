@@ -83,7 +83,7 @@ configuration.
 
 #### Tier: `terraform`
 
-- **Selector:** Repos with any `*.tf` at root OR `terragrunt.hcl`.
+- **Selector:** Repos with any `*.tf` at root.
 - **Workflows:**
   - `terraform.yml`
 - **Secrets:** none.
