@@ -139,7 +139,7 @@ For each of the top 5 Linear candidates, classify on these axes:
 
 1. **Repo identifiability** — Does the description name a specific GitHub repo? Scan for `\b(dryvist)/[\w.-]+\b`. issue-solver operates only within `$GH_OWNER` — treat any repo whose owner resolves outside `$GH_OWNER`/`dryvist` (e.g. a personal-account repo) as repo_identifiable = NO. If exactly one in-scope repo is named with clear context → YES. If zero or ambiguously multiple → NO.
 
-2. **Sandbox-feasibility** — Does the task require ONLY repo edits + `gh` API + Linear API? NO if the description mentions: hardware (BIOS, PXE, firmware, drives), physical access (rack, plug, console), SSH to a host, `terragrunt apply`, `terraform apply`, `ansible-playbook`, AWS credentials, DNS records, certificate issuance, Proxmox/PVE/iDRAC operations, network device config (UniFi, switch), live infra apply.
+2. **Sandbox-feasibility** — Does the task require ONLY repo edits + `gh` API + Linear API? NO if the description mentions: hardware (BIOS, PXE, firmware, drives), physical access (rack, plug, console), SSH to a host, `tofu apply`, a Terrakube run, `ansible-playbook`, OpenBao credentials, DNS records, certificate issuance, Proxmox/PVE/iDRAC operations, network device config (UniFi, switch), live infra apply.
 
 3. **Complexity** — `trivial` = ≤1 file ≤20 lines. `small` = 1–3 files ≤100 lines. `medium` = 4+ files OR architecture change. `large` = needs design. issue-solver accepts only trivial/small.
 
