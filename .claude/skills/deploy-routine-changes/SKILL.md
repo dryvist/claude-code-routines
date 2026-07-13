@@ -80,8 +80,14 @@ Also read the single pinned cloud environment id once per run — the
 repo, not the cloud UI, owns which environment each routine runs in:
 
 ```bash
-ENVIRONMENT_ID=$(grep -m1 '^ENVIRONMENT_ID=' routines/_common/deploy.config | cut -d= -f2 | tr -d '\r')
-MODEL=$(grep -m1 '^CLAUDE_SONNET_MODEL_ID=' routines/_common/deploy.config | cut -d= -f2 | tr -d '\r')
+ENVIRONMENT_ID=$(
+  grep -m1 '^ENVIRONMENT_ID=' routines/_common/deploy.config |
+    cut -d= -f2 | tr -d '\r'
+)
+MODEL=$(
+  grep -m1 '^CLAUDE_SONNET_MODEL_ID=' routines/_common/deploy.config |
+    cut -d= -f2 | tr -d '\r'
+)
 ```
 
 Every create/update below sets `job_config.ccr.environment_id` to
