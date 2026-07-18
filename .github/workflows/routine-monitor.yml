@@ -8,19 +8,19 @@
 #     than the routine's threshold (3 days; docs-sync 9 — weekly cadence).
 #     A dead routine writes nothing; preflight-FATAL loops also show up here.
 #   DRIFT   — (cloud routines only) the state file's prompt_sha256 differs
-#     from the SHA-256 of the rendered repo prompt's body (everything after
-#     the rendered frontmatter). Expected drift: a routine PR merged but the
+#     from the SHA-256 of the rendered catalog prompt body. Expected drift: a
+#     routine PR merged but the
 #     manual RemoteTrigger deploy hasn't happened yet — that is the designed
 #     "you forgot to deploy" signal.
 #
-# Hash calibration: the routine-side recipe (routines/_common/state-file.md)
-# and the awk extraction below must hash identical bytes. If the first live
+# Hash calibration: the routine-side recipe in the central state-file fragment
+# and the rendered file below must hash identical bytes. If the first live
 # comparison mismatches on every routine, adjust the extraction (leading blank
 # line / trailing newline) until one known-good routine matches, and update
 # this header. If drift stays incorrigibly noisy after two weeks, drop the sha
 # comparison and keep liveness only.
 #
-# issue-solver is GHA-managed (prompt is repo-native, drift impossible) —
+# issue-solver is GHA-managed from the pinned catalog (cloud drift impossible) —
 # liveness only.
 #
 # Findings land on ONE tracking issue: "[routine-monitor] drift/liveness
@@ -52,6 +52,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
+          submodules: true
 
       - name: Mint dryvist-claude installation token (routine-state read)
         id: app-token
@@ -74,11 +75,10 @@ jobs:
           NOW=$(date -u +%s)
           for f in /tmp/rendered/*.prompt.md; do
             NAME=$(basename "$f" .prompt.md)
-            SRC="routines/$NAME.prompt.md"
             THRESHOLD_DAYS=3
             [ "$NAME" = "docs-sync" ] && THRESHOLD_DAYS=9
-            IS_CLOUD=0
-            grep -q '^trigger_id:' "$SRC" && IS_CLOUD=1
+            IS_CLOUD=1
+            [ "$NAME" = "issue-solver" ] && IS_CLOUD=0
 
             STATE_PATH="state/$NAME.json"
             if ! RESP=$(gh api "repos/$STATE_REPO/contents/$STATE_PATH?ref=data" 2>/dev/null); then
@@ -97,7 +97,7 @@ jobs:
 
             if [ "$IS_CLOUD" = "1" ]; then
               REPORTED_SHA=$(echo "$RESP" | jq -r '.content' | base64 -d | jq -r '.prompt_sha256 // empty')
-              RENDERED_SHA=$(awk 'f; /^---$/{c++; if(c==2) f=1}' "$f" | sha256sum | cut -d' ' -f1)
+              RENDERED_SHA=$(sha256sum "$f" | cut -d' ' -f1)
               if [ -n "$REPORTED_SHA" ] && [ "$REPORTED_SHA" != "$RENDERED_SHA" ]; then
                 echo "- **DRIFT** \`$NAME\`: deployed prompt sha \`${REPORTED_SHA:0:12}…\` != rendered repo sha \`${RENDERED_SHA:0:12}…\` — deploy the routine (or calibrate the hash, see workflow header)" >> /tmp/findings.md
               fi

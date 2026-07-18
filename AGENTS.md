@@ -1,27 +1,28 @@
 # Claude Code Routines — Operator Guide
 
-This repo is the source of truth for the cloud routines hosted on
-Anthropic's Claude Code platform. Files in `routines/*.prompt.md` are the
-versioned prompts; the cloud manages execution.
+This repo owns deployment metadata and consumers for cloud routines hosted on
+Anthropic's Claude Code platform. Prompt bodies are pinned from
+`dryvist/ai-llm-prompts` through `vendor/ai-llm-prompts`; the cloud manages
+execution.
 
 ## Routine inventory
 
 The registry (routine names, files, crons, purposes) lives in the
 [README `Routines` table](README.md#routines) — single canonical home,
-do not duplicate it here. Every live cloud trigger MUST map to one
-`routines/<basename>.prompt.md` file, matched by the `trigger_id` in
-its YAML frontmatter — or be disabled. `trigger_id`s are pinned; never
-change them. A new value means a new cloud routine, not an update.
+do not duplicate it here. Every live cloud trigger MUST map to one entry in
+`routines/registry.yaml`, matched by its pinned `trigger_id`, and one central
+catalog prompt — or be disabled. `trigger_id`s are pinned; never change them.
+A new value means a new cloud routine, not an update.
 
 `issue-solver` (cron `0 0,12 * * *`) runs as a GitHub Actions workflow
 (`.github/workflows/issue-solver.yml`), not as a cloud routine — no
-`trigger_id` in its frontmatter. It's listed in the registry for
-completeness but is not deployed via the cloud-routine path.
+`trigger_id` in its registry entry. It's listed in the registry for completeness
+but is not deployed via the cloud-routine path.
 
 ## Naming convention (2026-07 consolidation)
 
 One functional kebab-case token per routine, used identically everywhere:
-frontmatter `name`, file basename, attribution tag `[routine:<name>]`,
+registry `name`, prompt basename, attribution tag `[routine:<name>]`,
 state file `state/<name>.json`, Slack header, and branch prefix. No
 display names, no personas — the old "The Observer"-style names created
 three-token drift (display vs basename vs tag). Rename ledger (trigger_ids
@@ -110,57 +111,31 @@ stay pinned across renames):
 
 ## DRY partials and deploy-time assembly
 
-Repo prompt files are the DRY source form. Boilerplate shared across
-routines lives in `routines/_common/` as self-contained markdown
-partials:
+The pinned catalog under `vendor/ai-llm-prompts/automation/` owns routine
+prompt bodies and flattened `routine-fragment-*.md` partials. Local
+`routines/registry.yaml` owns trigger IDs, cron schedules, allowed tools,
+MCP connections, and autofix settings; `routines/_common/deploy.config`
+retains the cloud environment and default model pins.
 
-| Partial | Carries |
-| --- | --- |
-| `hard-rules.md` | Pause + preflight gate, committer recipe, redaction |
-| `preflight.md` | Auth + REST-egress canaries; `🔴 FATAL` template |
-| `state-file.md` | State I/O, SHA lock, retention, budget, fingerprint |
-| `state-migrate.md` | One-run state-path migration (remove ~2026-07-20) |
-| `attribution.md` | Title suffix, no-emoji, Provenance block, label |
-| `slack-output.md` | Mandatory message, `<`/`>` sanitization function |
-| `redaction.md` | Canonical redaction regex set |
-| `prerequisites.md` | Required env vars + tools |
-| `skip-list.md` | Repos no routine scans |
-
-A routine pulls a partial in with a marker line containing exactly:
+A central routine includes a fragment with exactly:
 
 ```text
-<!-- include: _common/<name>.md -->
+<!-- include: routine-fragment-<name>.md -->
 ```
 
-Routine-specific values (PR caps, state-file names, schedules, divergences)
-stay in the routine file near the marker. Partials must not contain
-nested include markers.
+`scripts/render-routine.sh <basename>` strips OKF frontmatter and expands
+those markers. It exits nonzero on missing or nested fragments. The deployed
+blob is always this rendered body. CI renders all eight prompts, and
+`issue-solver.yml` reads a rendered workspace file.
 
-`scripts/render-routine.sh <routine-path>` expands the markers and
-prints the full prompt; it exits nonzero on an unresolvable include or
-a nested include. **The deployed blob is always the rendered output,
-never the raw file** — the deploy skill renders before every
-RemoteTrigger call, and CI (`.github/workflows/render-check.yml`)
-renders every prompt on each PR and uploads the rendered blobs as an
-artifact. Editing a partial changes the rendered body of every routine
-that includes it — redeploy all affected routines.
-
-`issue-solver.prompt.md` includes only the `prerequisites.md` partial:
-it runs in GitHub Actions with App-token commit attribution and
-intentionally diverges on committer, attribution, and output
-conventions.
-
-The "Hard rules" and "Attribution conventions" sections below remain
-the operator-facing description; the prompt-body encoding of those
-rules lives in the `routines/_common/` partials. Keep the two in sync
-when a rule changes.
+The operator-facing hard rules below remain descriptive. Model-directed rule
+text belongs in the central prompt catalog.
 
 ## Deploying a prompt change
 
-The cloud routine has its own copy of each prompt. Editing a `.prompt.md`
-file does **not** change cloud behaviour on its own — the change must be
-rendered (`scripts/render-routine.sh`) and pushed to the Anthropic
-Routines API.
+The cloud routine has its own deployed copy of each prompt. Advancing the
+catalog gitlink does **not** change cloud behaviour on its own — the selected
+central prompt must be rendered and pushed to the Anthropic Routines API.
 
 ### Active path: Claude in an interactive session
 
@@ -173,7 +148,7 @@ header for full diagnosis). While the token issue is upstream-blocked,
 cloud routines are kept in sync by Claude itself during editing
 sessions:
 
-1. Edit a `routines/*.prompt.md` file as usual.
+1. Release the central prompt change and advance the pinned catalog gitlink.
 2. A repo-level hook in `.claude/settings.json` reminds Claude to
    invoke the project skill at
    [`.claude/skills/deploy-routine-changes/SKILL.md`](.claude/skills/deploy-routine-changes/SKILL.md).
@@ -189,8 +164,8 @@ duplicate it here.
 
 When the OAuth token starts carrying the org UUID (Anthropic-side
 fix), restore the `on:` block in
-`.github/workflows/deploy-routines.yml` and remove the DEPRECATED
-banner from `.github/workflows/prompts/deploy-routines.prompt.md`.
+`.github/workflows/deploy-routines.yml` and update the central
+`routine-deploy-reference.md` status.
 Update this section to point at the workflow as the primary path
 again.
 
@@ -319,7 +294,7 @@ identity/auth/signing model in one place).
    on the **`data` branch** of `$STATE_REPO` (a `$GH_OWNER` repo; state
    uses `data` because the org ruleset makes `main` PR-only), read/written
    through the Contents API with SHA optimistic locking (see
-   `_common/state-file.md`). This includes the GHA-managed
+   the central `routine-fragment-state-file.md`). This includes the GHA-managed
    `issue-solver` (its 2026-07 migration retired the last gist). Schema:
 
    ```json
@@ -366,8 +341,9 @@ identity/auth/signing model in one place).
 
 11. **Prompt fingerprint (written AND consumed).** Each run overwrites
     the state file's `prompt_sha256` with the SHA-256 of the prompt
-    body it received (exact recipe in `_common/state-file.md`). The
-    consumer is `.github/workflows/routine-monitor.yml` — a daily
+    body it received (exact recipe in the central
+    `routine-fragment-state-file.md`). The consumer is
+    `.github/workflows/routine-monitor.yml` — a daily
     GHA-scheduled checker (App token, independent of `GH_TOKEN`) that
     compares each state file's fingerprint against the rendered repo
     prompt (drift) and checks the state file's last-write age

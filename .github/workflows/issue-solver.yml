@@ -20,6 +20,9 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          submodules: true
 
       - name: Mint dryvist-claude installation token
         id: app-token
@@ -48,6 +51,9 @@ jobs:
           [ -n "$id" ] || { echo "CLAUDE_SONNET_MODEL_ID not found in routines/_common/deploy.config"; exit 1; }
           echo "id=$id" >> "$GITHUB_OUTPUT"
 
+      - name: Render issue-solver prompt
+        run: scripts/render-routine.sh issue-solver > .rendered-issue-solver.md
+
       - name: Run issue-solver
         uses: anthropics/claude-code-action@e90deca47693f9457b72f2b53c17d7c445a87342 # v1.0.171
         env:
@@ -66,18 +72,7 @@ jobs:
           # the Routines/RemoteTrigger API (that breakage never affected this
           # workflow).
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt: >-
-            Read routines/issue-solver.prompt.md and follow every instruction
-            We run the prompt natively inside Actions, passing the
-            dryvist-claude App installation token in $GH_TOKEN, and a
-            Linear Personal API Key in $LINEAR_API_KEY (scoped to JAC team
-            only). All target-repo file changes go through the GraphQL
-            createCommitOnBranch mutation
-            mutation (via `gh api graphql`) from the prompt to attribute
-            those commits to dryvist-claude[bot]. Do not fall back to
-            the Contents API PUT, and do not attempt git push/commit/add
-            against target repos — both paths land unsigned or
-            wrong-identity commits and the tool allowlist blocks them.
+          prompt: Read .rendered-issue-solver.md and follow every instruction.
           claude_args: >-
             --allowedTools "Read,Edit,Write,Glob,Grep,WebFetch,Task,Bash(gh search:*),Bash(gh issue:*),Bash(gh pr:*),Bash(gh run:*),Bash(gh repo view:*),Bash(gh label:*),Bash(gh api repos/*:*),Bash(gh api graphql:*),Bash(curl -sS -X POST https://api.linear.app/graphql:*),Bash(jq:*),Bash(date:*),Bash(grep:*),Bash(base64:*),Bash(tr:*)"
             --max-turns 80

@@ -1,0 +1,84 @@
+version: 1
+catalog:
+  repository: dryvist/ai-llm-prompts
+  commit: 0431be6994d51169b9f705ddeba958eb8a4d0fc4
+  path_prefix: automation
+routines:
+  bot-pr-merge:
+    prompt: routine-bot-pr-merge.md
+    name: bot-pr-merge
+    trigger_id: trig_01N7W9LBApg9veyo2NgdprNV
+    cron: "15 11,17 * * *"
+    cron_human: Daily at 11:15 and 17:15 UTC (6:15 AM and 12:15 PM CT)
+    allowed_tools: [Bash, Read, Glob, Grep, WebFetch]
+    mcp_connections:
+      - name: Slack
+        url: https://mcp.slack.com/mcp
+  docs-polish:
+    prompt: routine-docs-polish.md
+    name: docs-polish
+    trigger_id: trig_01V6C6j9FHn21pk11YfrjURH
+    cron: "0 4 * * *"
+    cron_human: Daily at 4:00 UTC (11:00 PM CT)
+    autofix: true
+    allowed_tools: [Bash, Read, Write, Edit, Glob, Grep, WebFetch]
+    mcp_connections:
+      - name: Slack
+        url: https://mcp.slack.com/mcp
+  docs-sync:
+    prompt: routine-docs-sync.md
+    name: docs-sync
+    trigger_id: trig_01J9F82aQp1NX5W8PcvSXyh6
+    cron: "13 8 * * 1"
+    cron_human: Weekly on Mondays at 08:13 UTC (≈3:13 AM CT / 4:13 AM ET)
+    autofix: true
+    allowed_tools: [Bash, Read, Write, Edit, Glob, Grep, WebFetch]
+    mcp_connections:
+      - name: Slack
+        url: https://mcp.slack.com/mcp
+  estate-briefing:
+    prompt: routine-estate-briefing.md
+    name: estate-briefing
+    trigger_id: trig_01TUW8LMXob53okTF8juhkA8
+    cron: "0 10 * * *"
+    cron_human: Daily at 10:00 UTC (5:00 AM CT)
+    allowed_tools: [Bash, Read, Glob, Grep, WebFetch]
+    mcp_connections:
+      - name: Slack
+        url: https://mcp.slack.com/mcp
+  estate-janitor:
+    prompt: routine-estate-janitor.md
+    name: estate-janitor
+    trigger_id: trig_01PQsM64nMfQRYptyihRr3Er
+    cron: "0 7 * * *"
+    cron_human: Daily at 7:00 UTC (2:00 AM CT)
+    allowed_tools: [Bash, Read, Glob, Grep, WebFetch, WebSearch]
+    mcp_connections:
+      - name: Slack
+        url: https://mcp.slack.com/mcp
+  issue-solver:
+    prompt: routine-issue-solver.md
+    name: issue-solver
+    allowed_tools: [Read, Write, Edit, Glob, Grep, WebFetch, Task, Bash]
+  precommit-bump:
+    prompt: routine-precommit-bump.md
+    name: precommit-bump
+    trigger_id: trig_017wzm9n7a8v2yh3tfAsnmg8
+    cron: "0 8 * * *"
+    cron_human: Daily at 8:00 UTC (3:00 AM CT)
+    autofix: true
+    allowed_tools: [Bash, Read, Write, Glob, Grep, WebFetch]
+    mcp_connections:
+      - name: Slack
+        url: https://mcp.slack.com/mcp
+  repo-audit:
+    prompt: routine-repo-audit.md
+    name: repo-audit
+    trigger_id: trig_01Kaa2rWoVFS4HN4LRR5UMWX
+    cron: "0 6 * * *"
+    cron_human: Daily at 6:00 UTC (1:00 AM CT)
+    autofix: true
+    allowed_tools: [Bash, Read, Write, Glob, Grep, WebFetch]
+    mcp_connections:
+      - name: Slack
+        url: https://mcp.slack.com/mcp

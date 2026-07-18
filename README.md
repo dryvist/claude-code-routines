@@ -1,6 +1,6 @@
 # claude-code-routines
 
-Version-controlled prompt files for
+Version-controlled deployment metadata and pinned prompts for
 [Claude Code Routines][routines] — scheduled agents
 that manage a GitHub portfolio. The routine prompts
 are owner-agnostic; the operator sets `$GH_OWNER`
@@ -16,7 +16,7 @@ design decisions, and lessons learned.
 ## Routines
 
 Canonical registry — one row per live trigger, sorted by cron time.
-`trigger_id`s are pinned in each file's YAML frontmatter.
+`trigger_id`s and schedules are pinned in `routines/registry.yaml`.
 
 | Routine                  | Cron (UTC)       | Purpose                        |
 | ------------------------ | ---------------- | ------------------------------ |
@@ -36,16 +36,16 @@ naming convention and rename ledger in
 
 issue-solver runs as a GitHub Actions workflow
 (`.github/workflows/issue-solver.yml`), not a cloud routine — its
-prompt file has no `trigger_id`.
+registry entry has no `trigger_id`.
 
-[dp]: routines/docs-polish.prompt.md
-[ra]: routines/repo-audit.prompt.md
-[ej]: routines/estate-janitor.prompt.md
-[pb]: routines/precommit-bump.prompt.md
-[ds]: routines/docs-sync.prompt.md
-[eb]: routines/estate-briefing.prompt.md
-[bm]: routines/bot-pr-merge.prompt.md
-[is]: routines/issue-solver.prompt.md
+[dp]: vendor/ai-llm-prompts/automation/routine-docs-polish.md
+[ra]: vendor/ai-llm-prompts/automation/routine-repo-audit.md
+[ej]: vendor/ai-llm-prompts/automation/routine-estate-janitor.md
+[pb]: vendor/ai-llm-prompts/automation/routine-precommit-bump.md
+[ds]: vendor/ai-llm-prompts/automation/routine-docs-sync.md
+[eb]: vendor/ai-llm-prompts/automation/routine-estate-briefing.md
+[bm]: vendor/ai-llm-prompts/automation/routine-bot-pr-merge.md
+[is]: vendor/ai-llm-prompts/automation/routine-issue-solver.md
 
 Retired/merged triggers (disabled in the cloud, no source file):
 The Apothecary merged into bot-pr-merge and The Archivist into
@@ -123,13 +123,13 @@ disabled (see [Deploying Changes](#deploying-changes) below).
 The procedure lives in
 [`.claude/skills/deploy-routine-changes/SKILL.md`][skill]. A
 repo-level hook in `.claude/settings.json` reminds Claude to
-invoke the skill whenever a `routines/*.prompt.md` file is
-edited. For new routines, the skill opens a small follow-up PR to
-back-commit the issued `trigger_id`.
+invoke the skill whenever the catalog gitlink or `routines/registry.yaml` is
+edited. For new routines, the skill opens a small follow-up PR to back-commit
+the issued `trigger_id`.
 
 Cloud routines vs. GHA-managed prompts are distinguished by the
-presence of a `cron` field in YAML frontmatter; prompts without
-`cron` (e.g. `issue-solver.prompt.md`) run via their own native
+presence of a `cron` field in the registry; entries without
+`cron` (for example `issue-solver`) run via their own native
 workflows and are not touched by the skill.
 
 Env vars and MCP connections still need a one-time setting in the
@@ -174,12 +174,11 @@ the single `$GH_OWNER`, performs its task against the GitHub API, and
 posts a summary to Slack. issue-solver runs on its own GitHub Actions
 schedule instead of a cloud trigger.
 
-To change behaviour, edit the relevant `routines/*.prompt.md` file and
-let the deploy path re-sync the cloud trigger (see
-[Deploying Changes](#deploying-changes)). To add a routine, copy an
-existing prompt file, give it a unique `cron` value in the YAML
-frontmatter, and deploy — registration issues and back-commits the new
-`trigger_id`.
+To change behaviour, release the relevant central catalog prompt, advance the
+pinned gitlink, and let the deploy path re-sync the cloud trigger (see
+[Deploying Changes](#deploying-changes)). To add a routine, add its central
+prompt and a local registry entry with a unique cron, then deploy; registration
+back-commits the issued `trigger_id`.
 
 ## Deploying Changes
 
@@ -195,8 +194,8 @@ While that's upstream-blocked, the active deploy path is
 [`.claude/skills/deploy-routine-changes/SKILL.md`][skill] —
 Claude invokes it during an editing session in this repo (the
 interactive harness has working RemoteTrigger access). A
-repo-level hook nudges Claude to run the skill whenever a
-`routines/*.prompt.md` file is touched.
+repo-level hook nudges Claude to run the skill whenever the catalog pin or
+local registry is touched.
 
 For background and the manual `/schedule update` last-resort
 fallback, see [CLAUDE.md](CLAUDE.md).
@@ -205,52 +204,34 @@ fallback, see [CLAUDE.md](CLAUDE.md).
 
 ### Prompt assembly (DRY partials)
 
-Routine files in `routines/` are the DRY source form. Shared
-boilerplate (hard rules, connectivity preflight, state-file
-convention, attribution, Slack sanitization) lives in
-`routines/_common/` partials, pulled in by marker lines of the form
-`<!-- include: _common/<name>.md -->`.
-
-The deployed prompt is always the **rendered** output of
-`scripts/render-routine.sh <routine-path>`, which expands every
-marker (and fails on unresolvable or nested includes). The
-deploy skill renders before each RemoteTrigger call, and the
-[render-check workflow](.github/workflows/render-check.yml)
-renders every prompt in CI, uploading the blobs as an artifact.
-See [AGENTS.md](AGENTS.md) for the full mechanism.
+The immutable Git submodule `vendor/ai-llm-prompts` owns routine prompt
+bodies and flattened fragments. `routines/registry.yaml` owns deployment
+metadata. `scripts/render-routine.sh <basename>` strips OKF frontmatter
+and expands every `routine-fragment-*.md` marker before deployment.
+The render check builds all eight prompt bodies in CI.
 
 ## File Structure
 
 ```text
 claude-code-routines/
-├── README.md
-├── CLAUDE.md
+├── .gitmodules
 ├── AGENTS.md
-├── DESIGN.md
-├── docs/
-│   ├── CLOUD_ROUTINES_AUTH.md
-│   └── DISTRIBUTOR_RETIREMENT.md
+├── README.md
 ├── .claude/
 │   ├── settings.json
 │   └── skills/deploy-routine-changes/SKILL.md
-├── .github/
-│   ├── CODEOWNERS
-│   └── workflows/
-│       ├── deploy-routines.yml        # disabled (see header)
-│       ├── issue-solver.yml           # issue-solver (GHA)
-│       ├── routine-monitor.yml        # drift + liveness monitor
-│       └── prompts/
-│           └── deploy-routines.prompt.md
-└── routines/
-    ├── .markdownlint.yaml
-    ├── bot-pr-merge.prompt.md
-    ├── docs-polish.prompt.md
-    ├── docs-sync.prompt.md
-    ├── estate-briefing.prompt.md
-    ├── estate-janitor.prompt.md
-    ├── issue-solver.prompt.md
-    ├── precommit-bump.prompt.md
-    └── repo-audit.prompt.md
+├── .github/workflows/
+│   ├── deploy-routines.yml
+│   ├── issue-solver.yml
+│   ├── render-check.yml
+│   └── routine-monitor.yml
+├── routines/
+│   ├── registry.yaml
+│   └── _common/deploy.config
+├── scripts/
+│   ├── render-routine.sh
+│   └── render-all-routines.sh
+└── vendor/ai-llm-prompts
 ```
 
 ## License

@@ -1,14 +1,15 @@
 # CODEOWNERS — review-required paths
 #
-# Per §S4 of the routines rewrite plan: prompts are load-bearing
-# code that the cloud sandbox executes on cron. A malicious or
-# accidental edit to any of these files can mass-mutate the
+# Routine catalog pins and deployment metadata are load-bearing code that the
+# cloud sandbox executes on cron. A malicious or accidental edit can mass-mutate the
 # dryvist estate via the `dryvist-claude` GitHub App
 # (contents:write across the owner).
 #
 # Pair with branch protection requiring CODEOWNERS review.
 
 /routines/                              @JacobPEvans-personal
+/vendor/ai-llm-prompts                  @JacobPEvans-personal
+/.gitmodules                            @JacobPEvans-personal
 /.claude/skills/deploy-routine-changes/ @JacobPEvans-personal
 /CLAUDE.md                              @JacobPEvans-personal
 /.github/CODEOWNERS                     @JacobPEvans-personal
