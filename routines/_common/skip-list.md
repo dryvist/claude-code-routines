@@ -1,6 +1,0 @@
-- Archived repos.
-- `agentics`, `agent-os` (upstream mirrors).
-- `tf-static-website` (abandoned).
-- `dryvist`, `dryvist.github.io`, `.github` (profile/meta).
-- Splunk-app legacy repos.
-- `docs` itself (the docs site is a target, not a subject).

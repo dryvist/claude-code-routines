@@ -1,8 +1,8 @@
 ---
 name: Deploy routine changes
 description: >-
-  Use whenever a `routines/*.prompt.md` file in this repo
-  (`claude-code-routines`) is created or edited. The GHA deploy
+  Use whenever the pinned `vendor/ai-llm-prompts` routine catalog or
+  local `routines/registry.yaml` deployment metadata changes. The GHA deploy
   workflow at `.github/workflows/deploy-routines.yml` is disabled
   because its `CLAUDE_CODE_OAUTH_TOKEN` cannot reach the Anthropic
   Routines API — see the workflow header for details. Cloud-routine
@@ -20,64 +20,43 @@ disabled; do not try to trigger it.
 
 ## When to run
 
-- A routine file at `routines/*.prompt.md` was created or modified
-  during this session (the `.claude/settings.json` hook should have
-  reminded you).
-- The user merged a PR that touched a routine file and you are
-  picking up afterward.
-- Drift suspected on a routine even without a recent edit.
+- The pinned `vendor/ai-llm-prompts` commit changed and its automation
+  catalog contains a routine prompt or fragment change.
+- Local deployment metadata in `routines/registry.yaml` changed.
+- The user merged either change and you are picking up afterward.
+- Drift is suspected even without a recent edit.
 
 ## Step 1 — Identify routines to sync
 
-```bash
-git diff --name-only origin/main...HEAD -- 'routines/' 2>/dev/null
-git diff --name-only HEAD -- 'routines/'
-```
+The Git submodule is the immutable prompt source. If its gitlink changed,
+inspect the old-to-new catalog diff for `automation/routine-*.md`.
+A fragment change affects every prompt containing that fragment marker.
+If the affected set cannot be proven narrowly, sync all cloud routines
+listed in `routines/registry.yaml`; the drift check prevents unnecessary
+updates. The GHA-managed `issue-solver` is never a cloud deploy target.
 
-Union the two lists. If a `routines/_common/*.md` partial appears,
-expand it to every `routines/*.prompt.md` file containing an include
-marker for it (`grep -l 'include: _common/<name>.md' routines/*.prompt.md`).
-If the union is empty and no drift is suspected, stop here.
+If only `routines/registry.yaml` changed, select the entries whose
+deployment metadata changed. If nothing changed and no drift is suspected,
+stop here.
 
-If working from a post-merge session (no diff against `origin/main`),
-fall back to syncing every cloud routine in the repo:
+## Step 2 — Per routine: read metadata, then render
 
-```bash
-ls routines/*.prompt.md
-```
+`routines/registry.yaml` owns `name`, `trigger_id`, `cron`,
+`allowed_tools`, MCP connections, and `autofix`. The catalog owns only
+the model-directed body and its reusable fragments.
 
-## Step 2 — Per file: render, then parse the frontmatter
-
-Routine files are the DRY source form: they contain
-`<!-- include: _common/<name>.md -->` markers that reference shared
-partials in `routines/_common/`. The cloud routine must receive the
-RENDERED prompt — never the raw file with markers in it.
-
-Render first:
+Render the selected routine by basename:
 
 ```bash
-scripts/render-routine.sh routines/<basename>.prompt.md > /tmp/<basename>.rendered.md
+scripts/render-routine.sh <basename> > /tmp/<basename>.rendered.md
 ```
 
-If the script exits nonzero (unresolvable include, nested include in a
-partial), STOP for this file — report `FAIL <basename> (render error)`
-and do NOT deploy it. A render failure is never deployable.
+The renderer strips catalog OKF registry entry and expands every flattened
+`routine-fragment-<name>.md` marker. Its output is the complete prompt
+BODY sent to RemoteTrigger. If rendering fails, report
+`FAIL <basename> (render error)` and do not deploy it.
 
-From the RENDERED output: the YAML frontmatter is everything between
-the first two `---` lines. Extract:
-
-- `name`
-- `trigger_id` (may be absent)
-- `cron` (may be absent)
-- `model` (may be absent → use `$MODEL` default from `deploy.config`)
-- `allowed_tools`
-- `autofix` (may be absent → treat as `false`)
-
-The prompt BODY is everything after the closing `---` of the RENDERED
-output. All `update`/`create` content below means this rendered BODY.
-
-Also read the single pinned cloud environment id once per run — the
-repo, not the cloud UI, owns which environment each routine runs in:
+Also read the pinned cloud environment and default model:
 
 ```bash
 ENVIRONMENT_ID=$(
@@ -90,29 +69,17 @@ MODEL=$(
 )
 ```
 
-Every create/update below sets `job_config.ccr.environment_id` to
-`$ENVIRONMENT_ID`. The environment's secrets (`GH_OWNER`, `GH_TOKEN`)
-live only in the cloud — this pins WHICH environment, not what's in it.
-`$MODEL` is the default routine model: a file's frontmatter `model`
-wins if present, otherwise use `$MODEL`.
+Every create/update uses the registry entry plus `$ENVIRONMENT_ID`.
+A registry `model` overrides `$MODEL`; absent `autofix` means
+`false`.
 
-Note: editing a partial in `routines/_common/` changes the rendered
-body of EVERY routine that includes it. If a `_common/*.md` file was
-modified this session, treat all cloud routines as candidates and let
-the Step 5 drift check sort out which ones actually changed.
-
-## Step 3 — Decide what to do per file
+## Step 3 — Decide what to do per registry entry
 
 | `trigger_id` | `cron` | Action |
 | --- | --- | --- |
-| absent | absent | SKIP — GHA-managed (see Note A) |
+| absent | absent | SKIP — GHA-managed (`issue-solver`) |
 | absent | present | CREATE — follow Step 4 |
 | present | (any) | UPDATE-IF-DRIFTED — follow Step 5 |
-
-Note A: prompts without `trigger_id` and without `cron` are
-GHA-managed (e.g. `issue-solver.prompt.md`, driven by
-`.github/workflows/issue-solver.yml`). Do not touch them from
-this skill.
 
 ## Step 4 — Create a new cloud routine
 
@@ -121,8 +88,8 @@ other top-level fields that are easy to drop. The reliable path:
 **fetch the canonical shape from an existing routine first, then
 substitute only the per-routine fields.**
 
-1. Pick any sibling file with a `trigger_id` (e.g.
-   `routines/docs-polish.prompt.md`). Call:
+1. Pick any sibling registry entry with a `trigger_id` (e.g.
+   `docs-polish`). Call:
 
    ```text
    RemoteTrigger action=get trigger_id=<sibling-trigger-id>
@@ -132,16 +99,16 @@ substitute only the per-routine fields.**
    entire `job_config` and every top-level field**, then substituting
    only:
 
-   - top-level `name` ← new file's frontmatter `name`
-   - top-level `cron_expression` ← new file's frontmatter `cron`
-     (note the rename: API field is `cron_expression`, frontmatter
+   - top-level `name` ← new file's registry entry `name`
+   - top-level `cron_expression` ← new file's registry entry `cron`
+     (note the rename: API field is `cron_expression`, registry entry
      field is `cron`)
-   - `job_config.ccr.session_context.allowed_tools` ← frontmatter
+   - `job_config.ccr.session_context.allowed_tools` ← registry entry
      `allowed_tools`
-   - `job_config.ccr.session_context.model` ← frontmatter `model`
+   - `job_config.ccr.session_context.model` ← registry entry `model`
      if present, else `$MODEL` from `routines/_common/deploy.config`
    - `job_config.ccr.session_context.autofix_on_pr_create` ←
-     frontmatter `autofix` (absent → `false`)
+     registry entry `autofix` (absent → `false`)
    - `job_config.ccr.environment_id` ← `$ENVIRONMENT_ID` from
      `routines/_common/deploy.config` (Step 2)
    - `job_config.ccr.events[0].data.message.content` ← the RENDERED
@@ -162,12 +129,12 @@ substitute only the per-routine fields.**
    Extract `id` from the response — that's the new `trigger_id`.
 
 5. Edit the routine file: insert `trigger_id: <new-id>` into the
-   frontmatter immediately after the `name:` line. Don't reorder
+   registry entry immediately after the `name:` line. Don't reorder
    anything else.
 
 6. Commit and push the trigger_id back-commit via the normal
    local git flow (worktree → branch → commit → push →
-   `gh pr create`). Keep the diff to the one frontmatter line — a
+   `gh pr create`). Keep the diff to the one registry entry line — a
    small follow-up PR is the right shape. Commit message:
    `chore(routines): set trigger_id for <basename>`.
 
@@ -191,14 +158,14 @@ substitute only the per-routine fields.**
    (`job_config.ccr.events[0].data.message.content`),
    `job_config.ccr.environment_id`, and
    `job_config.ccr.session_context.autofix_on_pr_create`. Take the
-   RENDERED BODY, `$ENVIRONMENT_ID`, and the frontmatter `autofix`
-   from Step 2. Normalize both `autofix_on_pr_create` and frontmatter
+   RENDERED BODY, `$ENVIRONMENT_ID`, and the registry entry `autofix`
+   from Step 2. Normalize both `autofix_on_pr_create` and registry entry
    `autofix` to `false` when absent or `null` before comparing — older
    routines may lack the field and the API may omit falsey values.
 
 3. **In sync only if ALL THREE match**: CLOUD_BODY == RENDERED BODY,
    `environment_id` == `$ENVIRONMENT_ID`, and `autofix_on_pr_create`
-   == frontmatter `autofix`. If so, report `SKIP <basename> (in sync)`
+   == registry entry `autofix`. If so, report `SKIP <basename> (in sync)`
    and move on. (Body-only checks let an out-of-band env or autofix
    drift slip through — that is exactly the bug this guards against.)
 
@@ -208,19 +175,19 @@ substitute only the per-routine fields.**
    response and substituting only:
 
    - `job_config.ccr.events[0].data.message.content` ← RENDERED BODY
-   - `job_config.ccr.session_context.allowed_tools` ← frontmatter
+   - `job_config.ccr.session_context.allowed_tools` ← registry entry
      `allowed_tools`
-   - `job_config.ccr.session_context.model` ← frontmatter `model`
+   - `job_config.ccr.session_context.model` ← registry entry `model`
      if present, else `$MODEL` from `routines/_common/deploy.config`
    - `job_config.ccr.session_context.autofix_on_pr_create` ←
-     frontmatter `autofix` (absent → `false`)
+     registry entry `autofix` (absent → `false`)
    - `job_config.ccr.environment_id` ← `$ENVIRONMENT_ID`
-   - top-level `cron_expression` ← frontmatter `cron`
+   - top-level `cron_expression` ← registry entry `cron`
 
-   If the frontmatter `name` differs from the trigger's top-level
+   If the registry entry `name` differs from the trigger's top-level
    `name` (a rename), also substitute:
 
-   - top-level `name` ← frontmatter `name`
+   - top-level `name` ← registry entry `name`
 
    Preserve everything else verbatim — same rule as Step 4,
    including the `type: "user"` nested inside
@@ -238,7 +205,7 @@ substitute only the per-routine fields.**
 6. Verify: re-issue `RemoteTrigger action=get`. Confirm the returned
    content equals RENDERED BODY (exact — sha or `diff`),
    `environment_id` == `$ENVIRONMENT_ID`, and `autofix_on_pr_create`
-   == frontmatter `autofix`. If any check fails, surface it in the
+   == registry entry `autofix`. If any check fails, surface it in the
    report and stop — do not retry blindly.
 
 ## Step 5b — Disabling a retired or merged-away trigger
@@ -275,14 +242,14 @@ Cloud routine sync:
 
 ## Hard rules
 
-- **Never** send a raw `routines/*.prompt.md` body containing
-  `<!-- include: ... -->` markers to RemoteTrigger. Always render via
+- **Never** send a raw catalog prompt containing unresolved include markers
+  to RemoteTrigger. Always render via
   `scripts/render-routine.sh` first; the deployed blob is the rendered
   output. Refuse to deploy any file whose render fails.
 - **Never** call `gh workflow run deploy-routines.yml`. The workflow
   is disabled; running it produces no-op success and confuses the
   signal.
-- **Never** modify `routines/issue-solver.prompt.md` and expect this
+- **Never** modify the `issue-solver` registry entry and expect this
   skill to sync it. Issue Solver is GHA-managed; its body lives in
   the repo only.
 - **Never** trust an `is_error: false` from the agent wrapper as

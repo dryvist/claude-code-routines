@@ -16,7 +16,7 @@
 #   running interactively in this repo. See
 #   `.claude/skills/deploy-routine-changes/SKILL.md` for the procedure
 #   and `.claude/settings.json` for the hook that reminds Claude to
-#   invoke the skill whenever a `routines/*.prompt.md` file is edited.
+#   invoke the skill whenever a central routine prompt is edited.
 #   The interactive harness has working RemoteTrigger access.
 #
 # To re-enable: once the OAuth token starts carrying the org UUID
@@ -54,6 +54,15 @@ jobs:
     if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+          submodules: true
+
+      - name: Render deploy reference
+        run: >-
+          scripts/render-routine.sh
+          vendor/ai-llm-prompts/automation/routine-deploy-reference.md
+          > .rendered-deploy-reference.md
 
       - uses: anthropics/claude-code-action@e90deca47693f9457b72f2b53c17d7c445a87342 # v1
         env:
@@ -62,9 +71,7 @@ jobs:
           github_token: ${{ github.token }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           show_full_output: true
-          prompt: >-
-            Read .github/workflows/prompts/deploy-routines.prompt.md and follow
-            every instruction in it.
+          prompt: Read .rendered-deploy-reference.md and follow every instruction.
           claude_args: >-
             --allowedTools "Read,Edit,Glob,RemoteTrigger,Bash(gh api repos/*:*),Bash(jq:*),Bash(base64:*)"
             --max-turns 40

@@ -1,6 +1,6 @@
 ---
-# Render check — routines/*.prompt.md are the DRY source form with
-# `<!-- include: _common/<name>.md -->` markers. This workflow proves every
+# Render check — the pinned catalog stores DRY prompt bodies with flattened
+# `<!-- include: routine-fragment-<name>.md -->` markers. This workflow proves every
 # prompt renders cleanly (no unresolvable or nested includes) and uploads
 # the rendered blobs as an artifact so reviewers can inspect exactly what
 # the deploy-routine-changes skill would send to RemoteTrigger.
@@ -30,6 +30,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
+          submodules: true
 
       - name: Shellcheck the renderer
         run: shellcheck scripts/render-routine.sh scripts/render-all-routines.sh

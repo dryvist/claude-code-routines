@@ -1,5 +1,5 @@
 {
-  "$comment": "Project-level Claude Code settings for claude-code-routines. Committed (operator-specific settings live in .claude/settings.local.json, which is gitignored). The PostToolUse hook below nudges Claude to invoke the deploy-routine-changes skill whenever a routines/*.prompt.md file is touched, because the GHA deploy workflow is currently disabled (see .github/workflows/deploy-routines.yml and the skill SKILL.md for the full story).",
+  "$comment": "Project-level Claude Code settings for claude-code-routines. Prompt bodies are pinned through vendor/ai-llm-prompts; deployment metadata remains in routines/registry.yaml. The disabled GHA deploy path is documented in .github/workflows/deploy-routines.yml.",
   "hooks": {
     "PostToolUse": [
       {
@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r 'if ((.tool_input.file_path // \"\") | test(\"routines/([^/]+\\\\.prompt\\\\.md|_common/[^/]+\\\\.md)$\")) then \"Routine source edited (a routines/*.prompt.md file or a routines/_common/ partial — partial edits affect every routine that includes them). The GHA deploy workflow is disabled — invoke the project skill at .claude/skills/deploy-routine-changes/SKILL.md before ending the session, so the cloud routine bodies stay in sync via RemoteTrigger (the skill renders includes via scripts/render-routine.sh before deploying).\" else empty end' >&2"
+            "command": "jq -r 'if ((.tool_input.file_path // \"\") | test(\"(vendor/ai-llm-prompts/automation/routine-[^/]+\\\\.md|routines/registry\\\\.yaml)$\")) then \"Routine catalog or deployment metadata edited. The GHA deploy workflow is disabled — invoke .claude/skills/deploy-routine-changes/SKILL.md before ending the session so RemoteTrigger drift is assessed with the central renderer.\" else empty end' >&2"
           }
         ]
       }

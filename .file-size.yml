@@ -4,6 +4,3 @@ extended:
     - AGENTS
     - DESIGN
     - SKILL
-    - bot-pr-merge.prompt
-    - docs-sync.prompt
-    - issue-solver.prompt

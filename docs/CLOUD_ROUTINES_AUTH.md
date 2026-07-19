@@ -149,8 +149,9 @@ re-pasting unless you rotate the PAT at the same time.
 ## Outage recovery
 
 When routines post `🔴 FATAL` (or a run returns no data), the connectivity
-preflight (`_common/preflight.md`) has already classified the failure. Diagnose
-in this order — each layer is independent:
+preflight (`automation/routine-fragment-preflight.md` in the pinned catalog) has
+already classified the failure. Diagnose in this order — each layer is
+independent:
 
 1. **Token (HTTP 401 / "Bad credentials").** The PAT is invalid, expired, or was
    never re-pasted after a rotation. Verify with `gh api user` (does it return
@@ -176,7 +177,7 @@ in this order — each layer is independent:
 4. **Gist writes ("not permitted through this proxy", HTTP 403).** Categorical and
    unfixable — this is *why* state moved to `$STATE_REPO`. If you see this, a
    routine is still attempting a gist write; it should be using the Contents API
-   (`_common/state-file.md`) instead.
+   (`automation/routine-fragment-state-file.md` in the pinned catalog) instead.
 5. **State file (`state_fallback=true` banner, not FATAL).** Soft: the routine ran
    but couldn't read/write its `state/<routine>.json` (repo missing, or a transient
    error). Confirm `$STATE_REPO` exists and the token can write it. Memory is

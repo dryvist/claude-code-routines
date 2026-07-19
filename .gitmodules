@@ -1,0 +1,3 @@
+[submodule "vendor/ai-llm-prompts"]
+	path = vendor/ai-llm-prompts
+	url = https://github.com/dryvist/ai-llm-prompts.git

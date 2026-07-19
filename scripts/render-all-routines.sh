@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Render every routines/*.prompt.md into an output directory (default
-# /tmp/rendered). Exits nonzero if any render fails.
+# Render every centrally managed routine prompt into an output directory.
 set -euo pipefail
 
 out_dir="${1:-/tmp/rendered}"
@@ -8,8 +7,15 @@ mkdir -p "$out_dir"
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 repo_root="$(dirname "$script_dir")"
+catalog_root="${AI_LLM_PROMPTS_DIR:-$repo_root/vendor/ai-llm-prompts}"
 
-for f in "$repo_root"/routines/*.prompt.md; do
-  bash "$script_dir/render-routine.sh" "$f" > "$out_dir/$(basename "$f")"
-  echo "rendered $(basename "$f")"
+for prompt in "$catalog_root"/automation/routine-*.md; do
+  basename="$(basename "$prompt")"
+  case "$basename" in
+    routine-fragment-*|routine-deploy-reference.md) continue ;;
+  esac
+  name="${basename#routine-}"
+  name="${name%.md}"
+  bash "$script_dir/render-routine.sh" "$name" > "$out_dir/$name.prompt.md"
+  echo "rendered $name.prompt.md"
 done
