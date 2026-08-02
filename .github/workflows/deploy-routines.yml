@@ -64,7 +64,7 @@ jobs:
           vendor/ai-llm-prompts/automation/routine-deploy-reference.md
           > .rendered-deploy-reference.md
 
-      - uses: anthropics/claude-code-action@e90deca47693f9457b72f2b53c17d7c445a87342 # v1
+      - uses: anthropics/claude-code-action@be7b93b1907a4abad570368f3c74b6fe3807510b # v1
         env:
           GH_TOKEN: ${{ github.token }}
         with:
