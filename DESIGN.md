@@ -3,6 +3,11 @@
 How these routines came to be, what shaped them,
 and lessons learned along the way.
 
+> **Historical.** Everything below describes a system that no longer runs. The
+> cloud routines and the drift monitor were retired on 2026-08-06 — see
+> [`docs/RETIREMENT.md`](docs/RETIREMENT.md). Read this for the reasoning that
+> produced them, not as a description of what exists today.
+
 ## The Problem (April 2026)
 
 42+ GitHub repos generating constant noise:

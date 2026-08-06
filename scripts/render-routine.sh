@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Render one centrally managed routine prompt by stripping OKF frontmatter and
-# expanding flattened routine-fragment include markers.
+# expanding flattened fragment include markers.
+#
+# One consumer remains: .github/workflows/issue-solver.yml. The cloud routines
+# this also served were retired 2026-08-06 along with the substrate they ran on.
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
@@ -19,7 +22,7 @@ else
   name="${name#routine-}"
   name="${name%.prompt.md}"
   name="${name%.md}"
-  prompt_file="$catalog_root/automation/routine-$name.md"
+  prompt_file="$catalog_root/automation/$name.md"
 fi
 
 if [ ! -f "$prompt_file" ]; then
@@ -37,7 +40,7 @@ strip_frontmatter() {
 }
 
 base_dir="$(dirname "$prompt_file")"
-marker_re='^<!-- include: (routine-fragment-[A-Za-z0-9._-]+\.md) -->$'
+marker_re='^<!-- include: (fragment-[A-Za-z0-9._-]+\.md) -->$'
 rendered_source="$(strip_frontmatter "$prompt_file")"
 
 while IFS= read -r line || [ -n "$line" ]; do
