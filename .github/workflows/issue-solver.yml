@@ -55,7 +55,7 @@ jobs:
         run: scripts/render-routine.sh issue-solver > .rendered-issue-solver.md
 
       - name: Run issue-solver
-        uses: anthropics/claude-code-action@e90deca47693f9457b72f2b53c17d7c445a87342 # v1.0.171
+        uses: anthropics/claude-code-action@86180fa9e4d311eed10c9cc49854c53dab5d517a # v1.0.184
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
