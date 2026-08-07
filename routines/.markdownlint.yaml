@@ -1,5 +1,0 @@
----
-# Prompt files have YAML frontmatter before the first heading (MD041)
-# and long gh CLI commands in code blocks that cannot be wrapped (MD013)
-MD041: false
-MD013: false

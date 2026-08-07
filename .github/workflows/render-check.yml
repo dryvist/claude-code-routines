@@ -1,9 +1,9 @@
 ---
-# Render check — the pinned catalog stores DRY prompt bodies with flattened
-# `<!-- include: routine-fragment-<name>.md -->` markers. This workflow proves every
-# prompt renders cleanly (no unresolvable or nested includes) and uploads
-# the rendered blobs as an artifact so reviewers can inspect exactly what
-# the deploy-routine-changes skill would send to RemoteTrigger.
+# Render check — the pinned catalog stores the prompt body with flattened
+# `<!-- include: fragment-<name>.md -->` markers. This workflow proves it renders
+# cleanly (no unresolvable or nested includes) and uploads the rendered blob as
+# an artifact, so a reviewer sees exactly what issue-solver.yml will feed the
+# run step. A broken render here is a broken issue-solver run there.
 name: Render routines
 
 # Trigger note: pull_request is listed for completeness, but PR-event
@@ -33,12 +33,15 @@ jobs:
           submodules: true
 
       - name: Shellcheck the renderer
-        run: shellcheck scripts/render-routine.sh scripts/render-all-routines.sh
+        run: shellcheck scripts/render-routine.sh
 
-      - name: Render all routine prompts
-        run: scripts/render-all-routines.sh /tmp/rendered
+      - name: Render the issue-solver prompt
+        run: |
+          mkdir -p /tmp/rendered
+          scripts/render-routine.sh issue-solver > /tmp/rendered/issue-solver.md
+          [ -s /tmp/rendered/issue-solver.md ] || { echo "render produced an empty prompt"; exit 1; }
 
-      - name: Upload rendered prompts
+      - name: Upload rendered prompt
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: rendered-routines
