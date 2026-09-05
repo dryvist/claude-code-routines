@@ -1,3 +1,7 @@
+---
+skill-groups: [core, ai]
+---
+
 # Claude Code Routines — Operator Guide
 
 This repo runs **one** scheduled job: `issue-solver`, a GitHub Actions workflow
