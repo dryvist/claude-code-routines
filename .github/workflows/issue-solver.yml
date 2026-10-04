@@ -56,10 +56,11 @@ jobs:
           # Configure via:
           # gh secret set LINEAR_API_KEY --body "<key>" --repo <this-repo>
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
-          ANTHROPIC_BASE_URL: ${{ vars.OPENROUTER_BASE_URL }}
+          ANTHROPIC_BASE_URL: ${{ vars.OPENROUTER_BASE_URL || 'https://openrouter.ai/api' }}
         with:
           github_token: ${{ steps.app-token.outputs.token }}
           anthropic_api_key: ${{ secrets.OPENROUTER_API_KEY }}
+          allowed_bots: "github-actions,jacobpevans-claude"
           prompt: Read .rendered-issue-solver.md and follow every instruction.
           claude_args: >-
             --allowedTools "Read,Edit,Write,Glob,Grep,WebFetch,Task,Bash(gh search:*),Bash(gh issue:*),Bash(gh pr:*),Bash(gh run:*),Bash(gh repo view:*),Bash(gh label:*),Bash(gh api repos/*:*),Bash(gh api graphql:*),Bash(curl -sS -X POST https://api.linear.app/graphql:*),Bash(jq:*),Bash(date:*),Bash(grep:*),Bash(base64:*),Bash(tr:*)"

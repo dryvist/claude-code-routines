@@ -75,8 +75,11 @@ no long-lived PAT. The model selection variables are optional.
 | `GH_APP_CLAUDE_BOT_ID` | variable | App id for the token |
 | `GH_APP_CLAUDE_BOT_PRIVATE_KEY` | secret | Signing key for that App |
 | `OPENROUTER_API_KEY` | secret | Authenticates model requests |
-| `OPENROUTER_BASE_URL` | variable | Model request endpoint |
+| `OPENROUTER_BASE_URL` | variable | Optional endpoint override |
 | `LINEAR_API_KEY` | secret | Reads the task queue |
+
+The endpoint defaults to `https://openrouter.ai/api`; set this variable to
+override it.
 
 `AI_MODEL_ISSUES` selects the issue-solving model, then `AI_MODEL` is used as a
 fallback. Without either variable, the workflow uses `openrouter/free`.
