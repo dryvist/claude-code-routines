@@ -66,16 +66,20 @@ scripts/render-routine.sh issue-solver   # prints the rendered prompt
 An existing clone that predates the submodule needs
 `git submodule update --init vendor/ai-llm-prompts`.
 
-Running the workflow needs four values on the repository. The App token is
+Running the workflow needs five configured GitHub values. The App token is
 minted per run and scoped to the permissions that run actually uses; there is
-no long-lived PAT.
+no long-lived PAT. The model selection variables are optional.
 
 | Name | Kind | Purpose |
 | --- | --- | --- |
 | `GH_APP_CLAUDE_BOT_ID` | variable | App id for the token |
 | `GH_APP_CLAUDE_BOT_PRIVATE_KEY` | secret | Signing key for that App |
-| `CLAUDE_CODE_OAUTH_TOKEN` | secret | Authenticates the run to Anthropic |
+| `OPENROUTER_API_KEY` | secret | Authenticates model requests |
+| `OPENROUTER_BASE_URL` | variable | Model request endpoint |
 | `LINEAR_API_KEY` | secret | Reads the task queue |
+
+`AI_MODEL_ISSUES` selects the issue-solving model, then `AI_MODEL` is used as a
+fallback. Without either variable, the workflow uses `openrouter/free`.
 
 With `LINEAR_API_KEY` unset the run reports a configuration gap and exits. It
 does not fall back to GitHub issues — that path belongs to `ai-workflows`.
