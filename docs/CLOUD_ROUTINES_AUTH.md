@@ -170,7 +170,7 @@ independent:
    yet GraphQL and gist *writes* are blocked at the operation level). **No cloud
    routine uses GraphQL anymore** — the Custodian's `bot-thread-resolve` task was
    dropped in the 2026-07 consolidation for exactly this reason; its replacement
-   is the deterministic review-thread-janitor workflow in `dryvist/ai-workflows`
+   is the deterministic review-thread-janitor workflow in `JacobPEvans/.github-ai`
    (GHA runners have normal egress, GraphQL works there — same reason
    issue-solver and routine-monitor live in GHA). If a cloud routine hits this
    error, a GraphQL call crept back into a prompt; remove it.

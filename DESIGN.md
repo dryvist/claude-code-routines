@@ -261,7 +261,7 @@ The Solver's GitHub-Issue fallback (Phase 1b, gated on the
 queue: **Linear (JAC team)**. If Linear yields no work, it
 exits — it no longer looks at GitHub issues.
 
-Why: the GitHub issue → PR path is owned by `dryvist/ai-workflows`.
+Why: the GitHub issue → PR path is owned by `JacobPEvans/.github-ai`.
 Its `cc-issue-resolver` resolves issues event-driven on the
 `ai:ready` label (applied by `issue-triage`, and by the new
 `issue-backlog-sweep` for pre-existing backlog). Keeping a second,
@@ -269,7 +269,7 @@ cron-driven system that also pulled GitHub issues risked two
 systems opening rival PRs for the same issue — wasted tokens and
 merge conflicts. Splitting cleanly by source removes that race:
 
-- **GitHub issues → ai-workflows** (`cc-issue-resolver`, event-driven).
+- **GitHub issues → JacobPEvans/.github-ai** (`cc-issue-resolver`, event-driven).
 - **Linear tasks → The Solver** (cron, this repo).
 
 Sections above that describe the Solver triaging GitHub issues
@@ -317,7 +317,7 @@ inert until the Conductor happened to run — merged into `bot-pr-merge`
 The Custodian's `bot-thread-resolve` task was deleted outright: it
 was GraphQL-only and the cloud proxy permanently blocks GraphQL — a
 tenth of that routine's runs re-rolled the lottery for nothing. Its
-replacement is a deterministic GHA workflow in `ai-workflows`, where
+replacement is a deterministic GHA workflow in `JacobPEvans/.github-ai`, where
 GraphQL works.
 
 **The Solver's gist finally died.** Every other routine moved to

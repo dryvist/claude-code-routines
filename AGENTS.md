@@ -60,14 +60,14 @@ no emoji anywhere:
 ```
 
 **Label** `cloud-routine`, applied after creation. It is defined in
-`dryvist/.github` and propagated by `label-sync.yml`, so never
+`JacobPEvans/.github` and propagated by `label-sync.yml`, so never
 `gh label create` per repo.
 
 **Branch**: `<type>/issue-solver/<slug>-<YYYY-MM-DD>`. The date prevents
 collisions between runs.
 
-PRs open review-ready, not draft, so the `ai-workflows` review workflows pick
-them up. issue-solver never merges its own work.
+PRs open review-ready, not draft, so the `JacobPEvans/.github-ai` review
+workflows pick them up. issue-solver never merges its own work.
 
 ## Rules that still bind
 

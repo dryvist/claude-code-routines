@@ -64,7 +64,7 @@ skills and the Hermes triage job. The weighted-random task rotation was a
 scheduling artifact, not a function.
 
 **`precommit-bump`** — nothing salvaged. Renovate's native `pre-commit` manager
-does this. Repos still drifting are repos not yet on the `dryvist/.github`
+does this. Repos still drifting are repos not yet on the `JacobPEvans/.github`
 preset; onboard those instead of re-creating the job.
 
 **`issue-solver`** — kept, unchanged. It never ran on the cloud substrate. It

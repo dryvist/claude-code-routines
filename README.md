@@ -85,7 +85,7 @@ override it.
 fallback. Without either variable, the workflow uses `openrouter/free`.
 
 With `LINEAR_API_KEY` unset the run reports a configuration gap and exits. It
-does not fall back to GitHub issues — that path belongs to `ai-workflows`.
+does not fall back to GitHub issues — that path belongs to `JacobPEvans/.github-ai`.
 
 ## Usage
 

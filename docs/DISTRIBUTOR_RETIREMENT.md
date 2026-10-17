@@ -3,7 +3,7 @@
 The Distributor cloud routine
 (`trigger_id: trig_01HoVTrJjo41JFEyzmY1tU5b`) is retired. Its job —
 propagating thin workflow callers from
-[`dryvist/ai-workflows`](https://github.com/dryvist/ai-workflows) into
+[`JacobPEvans/.github-ai`](https://github.com/JacobPEvans/.github-ai) into
 every repo in the estate via per-repo Contents API PUTs — is now handled
 by GitHub org **Required Workflows** on the `dryvist` org. Per-repo
 caller files are no longer needed for dryvist repos.
@@ -43,7 +43,7 @@ returns 404.
 
 The Distributor's tier table maps to four Required Workflow sets. For
 each tier, create a Required Workflow in the dryvist org settings
-pointing at the corresponding `dryvist/ai-workflows` reusable workflow,
+pointing at the corresponding `JacobPEvans/.github-ai` reusable workflow,
 SHA-pinned to a tagged release (e.g. `v0.3.0`).
 
 GitHub's Required Workflow selector is a static list of repos, not a
@@ -111,10 +111,10 @@ These repos must never be added to any tier's Required Workflow
 selector (preserve the Distributor's original hard-exclude list):
 
 - Archived repos.
-- `dryvist/ai-workflows` (the source, not a consumer).
+- `JacobPEvans/.github-ai` (the source, not a consumer).
 - Upstream mirrors: `dryvist/agentics`, `dryvist/agent-os`.
 - Profile/meta repos: `dryvist/dryvist`, `dryvist/dryvist.github.io`,
-  `dryvist/.github`.
+  `JacobPEvans/.github`.
 - Abandoned: `dryvist/tf-static-website`.
 - Splunk-app legacy repos that intentionally have zero workflows.
 
