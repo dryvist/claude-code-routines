@@ -66,8 +66,8 @@ no emoji anywhere:
 **Branch**: `<type>/issue-solver/<slug>-<YYYY-MM-DD>`. The date prevents
 collisions between runs.
 
-PRs open review-ready, not draft, so the `JacobPEvans/.github-ai` review workflows pick
-them up. issue-solver never merges its own work.
+PRs open review-ready, not draft, so the `JacobPEvans/.github-ai` review
+workflows pick them up. issue-solver never merges its own work.
 
 ## Rules that still bind
 
