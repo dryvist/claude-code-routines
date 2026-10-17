@@ -98,8 +98,8 @@ with no quality impact for this workload.
 **Safety caps on every routine**:
 Max 8 PR merges, 10 issue closures, 3 issue
 creations, 15 branch deletions per Custodian run.
-Daily Polish creates draft PRs only — never
-auto-merges. Morning Briefing and Weekly Scorecard
+Daily Polish opens review-ready PRs labeled
+`human:review` — never auto-merges. Morning Briefing and Weekly Scorecard
 are strictly read-only. Comment deduplication
 prevents bot spam (check for existing comments
 within 7 days before posting).
@@ -131,7 +131,7 @@ locally where `gh` works, so this was never caught.
 
 ### Signed Commits
 
-Daily Polish creates draft PRs with file changes.
+Daily Polish opens review-ready PRs with file changes.
 In the cloud sandbox there is no local git identity,
 so `git commit` would produce unsigned commits.
 The fix: use the GitHub Contents API
@@ -169,7 +169,7 @@ labels and reports them.
 
 Issue Solver was added as a fifth routine, cloned
 from Daily Polish to inherit its conservative
-posture (DRAFT PRs, signed commits, hard caps,
+posture (human:review PRs, signed commits, hard caps,
 mandatory Slack output). The clone happened only
 after fixing two latent defects in Polish that
 would otherwise have propagated.
