@@ -98,8 +98,8 @@ with no quality impact for this workload.
 **Safety caps on every routine**:
 Max 8 PR merges, 10 issue closures, 3 issue
 creations, 15 branch deletions per Custodian run.
-Daily Polish opens review-ready PRs labeled
-`human:review` — never auto-merges. Morning Briefing and Weekly Scorecard
+Daily Polish opens review-ready PRs — never
+auto-merges. Morning Briefing and Weekly Scorecard
 are strictly read-only. Comment deduplication
 prevents bot spam (check for existing comments
 within 7 days before posting).
@@ -169,7 +169,7 @@ labels and reports them.
 
 Issue Solver was added as a fifth routine, cloned
 from Daily Polish to inherit its conservative
-posture (human:review PRs, signed commits, hard caps,
+posture (signed commits, hard caps,
 mandatory Slack output). The clone happened only
 after fixing two latent defects in Polish that
 would otherwise have propagated.
