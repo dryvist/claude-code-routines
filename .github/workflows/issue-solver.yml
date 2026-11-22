@@ -15,7 +15,6 @@ concurrency:
 jobs:
   solve:
     name: Pick one Linear task (JAC), open ready-for-review PR
-    # The review pool reaches the org LLM router; hosted runners do not.
     runs-on: review
     if: github.ref == 'refs/heads/main'
     timeout-minutes: 30
