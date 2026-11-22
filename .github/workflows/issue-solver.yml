@@ -15,7 +15,7 @@ concurrency:
 jobs:
   solve:
     name: Pick one Linear task (JAC), open ready-for-review PR
-    runs-on: ubuntu-latest
+    runs-on: review
     if: github.ref == 'refs/heads/main'
     timeout-minutes: 30
     steps:
@@ -44,6 +44,13 @@ jobs:
       - name: Render issue-solver prompt
         run: scripts/render-routine.sh issue-solver > .rendered-issue-solver.md
 
+      # The org router serves local models first and alone decides any fallback.
+      # Claude Code appends /v1/messages itself, so drop the router's /v1 suffix.
+      - name: Point Claude Code at the org router
+        env:
+          LLM_ROUTER_BASE_URL: ${{ secrets.LLM_ROUTER_BASE_URL }}
+        run: echo "ANTHROPIC_BASE_URL=${LLM_ROUTER_BASE_URL%/v1}" >> "$GITHUB_ENV"
+
       - name: Run issue-solver
         uses: anthropics/claude-code-action@acfe7992852970efb4fee683d63d628e3e52df67 # v1.0.286
         env:
@@ -56,13 +63,12 @@ jobs:
           # Configure via:
           # gh secret set LINEAR_API_KEY --body "<key>" --repo <this-repo>
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
-          ANTHROPIC_BASE_URL: ${{ vars.OPENROUTER_BASE_URL || 'https://openrouter.ai/api' }}
         with:
           github_token: ${{ steps.app-token.outputs.token }}
-          anthropic_api_key: ${{ secrets.OPENROUTER_API_KEY }}
+          anthropic_api_key: ${{ secrets.LLM_ROUTER_API_KEY }}
           allowed_bots: "github-actions,jacobpevans-claude"
           prompt: Read .rendered-issue-solver.md and follow every instruction.
           claude_args: >-
             --allowedTools "Read,Edit,Write,Glob,Grep,WebFetch,Task,Bash(gh search:*),Bash(gh issue:*),Bash(gh pr:*),Bash(gh run:*),Bash(gh repo view:*),Bash(gh label:*),Bash(gh api repos/*:*),Bash(gh api graphql:*),Bash(curl -sS -X POST https://api.linear.app/graphql:*),Bash(jq:*),Bash(date:*),Bash(grep:*),Bash(base64:*),Bash(tr:*)"
             --max-turns 80
-            --model ${{ vars.AI_MODEL_ISSUES || vars.AI_MODEL || 'openrouter/free' }}
+            --model medium

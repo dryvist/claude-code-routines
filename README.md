@@ -68,21 +68,19 @@ An existing clone that predates the submodule needs
 
 Running the workflow needs five configured GitHub values. The App token is
 minted per run and scoped to the permissions that run actually uses; there is
-no long-lived PAT. The model selection variables are optional.
+no long-lived PAT.
 
 | Name | Kind | Purpose |
 | --- | --- | --- |
 | `GH_APP_CLAUDE_BOT_ID` | variable | App id for the token |
 | `GH_APP_CLAUDE_BOT_PRIVATE_KEY` | secret | Signing key for that App |
-| `OPENROUTER_API_KEY` | secret | Authenticates model requests |
-| `OPENROUTER_BASE_URL` | variable | Optional endpoint override |
+| `LLM_ROUTER_API_KEY` | secret | Authenticates requests to the org LLM router |
+| `LLM_ROUTER_BASE_URL` | secret | The org LLM router endpoint |
 | `LINEAR_API_KEY` | secret | Reads the task queue |
 
-The endpoint defaults to `https://openrouter.ai/api`; set this variable to
-override it.
-
-`AI_MODEL_ISSUES` selects the issue-solving model, then `AI_MODEL` is used as a
-fallback. Without either variable, the workflow uses `openrouter/free`.
+The run uses the router's `medium` role on the `review` runner pool. The router
+serves local models first and alone decides any fallback; the workflow never
+calls a cloud provider directly.
 
 With `LINEAR_API_KEY` unset the run reports a configuration gap and exits. It
 does not fall back to GitHub issues — that path belongs to `JacobPEvans/.github-ai`.
